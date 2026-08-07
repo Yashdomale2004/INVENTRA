@@ -1,17 +1,33 @@
-import { ExternalLink, Package, Plus, Search, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Copy, ExternalLink, Package, Plus, Search, Trash2, Truck, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Input } from "../components/ui/input";
 import { getErrorMessage } from "../lib/errors";
 import { notifyInventorySync } from "../lib/inventorySync";
 import { getSelectedTrackingNumber, setSelectedTrackingNumber } from "../lib/orderStorage";
-import { isNotificationsEnabled, saveNotification } from "../lib/notificationsStorage";
-import { findEnquiryByTrackingNumber, updateEnquiryByTrackingNumber, type EnquiryRecord } from "../services/enquiries";
+import { notifyOrderDelivered } from "../lib/notificationsStorage";
+import {
+  fetchDispatchedEnquiries,
+  findEnquiryByTrackingNumber,
+  updateEnquiryByTrackingNumber,
+  type EnquiryRecord,
+} from "../services/enquiries";
 
 const BASE_TRACK_URL = "https://www.aftership.com/track?utm_source=inventra";
+
+function getOrderProduct(order: EnquiryRecord): string {
+  return order.customRequirement || order.combinations.find((item) => item.brand)?.brand || "Custom product";
+}
+
+function getOrderQuantity(order: EnquiryRecord): number {
+  return order.combinations.reduce((total, item) => {
+    return total + Object.values(item.quantities).reduce((sum, quantity) => sum + quantity, 0);
+  }, 0);
+}
 
 const SHIPMENTS_KEY = "inventra_shipments";
 
@@ -27,10 +43,13 @@ type Shipment = {
   createdAt: string;
 };
 
+const courierPresets = ["Speed Post", "Ajani", "DTDC"] as const;
+const MANUAL_COURIER_VALUE = "__manual__";
+
 const emptyShipmentForm = {
   items: "",
   dispatchDate: "",
-  courierCompany: "",
+  courierCompany: courierPresets[0] as string,
   expectedDelivery: "",
   trackingId: "",
   courierSlip: "",
@@ -49,10 +68,15 @@ export function TrackPage() {
   }>(null);
   const [matchedOrder, setMatchedOrder] = useState<EnquiryRecord | null>(null);
 
+  const [dispatchedOrders, setDispatchedOrders] = useState<EnquiryRecord[]>([]);
+  const [isDispatchedLoading, setIsDispatchedLoading] = useState(true);
+
   // Shipment form state
   const [shipmentForm, setShipmentForm] = useState(emptyShipmentForm);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isSavingShipment, setIsSavingShipment] = useState(false);
+  const [deleteShipmentId, setDeleteShipmentId] = useState<string | null>(null);
+  const [isManualCourier, setIsManualCourier] = useState(false);
 
   useEffect(() => {
     const raw = window.localStorage.getItem(SHIPMENTS_KEY);
@@ -87,12 +111,34 @@ export function TrackPage() {
     };
     persistShipments([newShipment, ...shipments]);
     setShipmentForm(emptyShipmentForm);
+    setIsManualCourier(false);
     setIsSavingShipment(false);
     toast.success("Shipment saved.");
   };
 
-  const deleteShipment = (id: string) => {
-    persistShipments(shipments.filter((s) => s.id !== id));
+  const handleCourierSelectChange = (value: string) => {
+    if (value === MANUAL_COURIER_VALUE) {
+      setIsManualCourier(true);
+      setShipmentForm((f) => ({ ...f, courierCompany: "" }));
+    } else {
+      setIsManualCourier(false);
+      setShipmentForm((f) => ({ ...f, courierCompany: value }));
+    }
+  };
+
+  const requestDeleteShipment = (id: string) => {
+    setDeleteShipmentId(id);
+  };
+
+  const confirmDeleteShipment = () => {
+    if (!deleteShipmentId) return;
+    persistShipments(shipments.filter((s) => s.id !== deleteShipmentId));
+    setDeleteShipmentId(null);
+    toast.success("Shipment history deleted.");
+  };
+
+  const cancelDeleteShipment = () => {
+    setDeleteShipmentId(null);
   };
 
   useEffect(() => {
@@ -100,6 +146,33 @@ export function TrackPage() {
     if (savedTrackingNumber) {
       setTrackingNumber(savedTrackingNumber);
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDispatchedOrders = () => {
+      setIsDispatchedLoading(true);
+      fetchDispatchedEnquiries()
+        .then((data) => {
+          if (!cancelled) setDispatchedOrders(data);
+        })
+        .catch((error) => {
+          console.error("[TrackPage] fetchDispatchedEnquiries failed", error);
+          if (!cancelled) toast.error(getErrorMessage(error, "Failed to load dispatched orders."));
+        })
+        .finally(() => {
+          if (!cancelled) setIsDispatchedLoading(false);
+        });
+    };
+
+    loadDispatchedOrders();
+    window.addEventListener("inventra:inventory-sync", loadDispatchedOrders);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("inventra:inventory-sync", loadDispatchedOrders);
+    };
   }, []);
 
   useEffect(() => {
@@ -140,15 +213,8 @@ export function TrackPage() {
         deliveryDate: new Date().toISOString().slice(0, 10),
       })
         .then((updatedOrder) => {
-          if (updatedOrder && isNotificationsEnabled()) {
-            saveNotification({
-              id: crypto.randomUUID(),
-              title: "📦 Parcel Delivered",
-              message: `Tracking ${updatedOrder.trackingNumber} has been marked as received.`,
-              notification_type: "delivery",
-              is_read: false,
-              created_at: new Date().toISOString(),
-            });
+          if (updatedOrder) {
+            notifyOrderDelivered(updatedOrder.orderId);
           }
 
           notifyInventorySync();
@@ -165,6 +231,33 @@ export function TrackPage() {
     if (!value) return BASE_TRACK_URL;
     return `${BASE_TRACK_URL}&tracking-number=${encodeURIComponent(value)}`;
   }, [trackingNumber]);
+
+  const viewDispatchedOrder = (order: EnquiryRecord) => {
+    setTrackingNumber(order.trackingNumber);
+    setMatchedOrder(order);
+    setActiveResult({
+      trackingNumber: order.trackingNumber || order.orderId,
+      current_status: order.orderStatus === "Received" ? "delivered" : order.orderStatus.toLowerCase(),
+      current_location: order.statusHistory.length ? "In transit" : "Unknown",
+      parcel_id: order.orderId,
+      assigned_person: order.assignerName,
+      invoice_number: order.trackingNumber || "-",
+    });
+
+    if (order.trackingNumber) {
+      setSelectedTrackingNumber(order.trackingNumber);
+    }
+  };
+
+  const copyTrackingNumber = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success("Tracking number copied.");
+    } catch (error) {
+      console.error("[TrackPage] copyTrackingNumber failed", error);
+      toast.error("Could not copy tracking number.");
+    }
+  };
 
   const handleSearch = async () => {
     const tracking = trackingNumber.trim();
@@ -246,6 +339,62 @@ export function TrackPage() {
         </div>
       </Card>
 
+      {/* ── Dispatched Orders ────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Dispatched Orders</h2>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {dispatchedOrders.length}
+          </span>
+        </div>
+
+        {isDispatchedLoading ? (
+          <p className="text-sm text-slate-500">Loading dispatched orders…</p>
+        ) : dispatchedOrders.length ? (
+          dispatchedOrders.map((order) => (
+            <Card key={order.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{order.orderId} · {order.customerName}</p>
+                  <p className="truncate text-xs text-slate-500">{getOrderProduct(order)}{getOrderQuantity(order) ? ` · ${getOrderQuantity(order)} pcs` : ""}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                  Dispatch
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-slate-800">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase text-slate-400">Tracking Number</p>
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{order.trackingNumber || "Not assigned yet"}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {order.trackingNumber ? (
+                    <button
+                      type="button"
+                      onClick={() => copyTrackingNumber(order.trackingNumber)}
+                      className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700"
+                      aria-label="Copy tracking number"
+                      title="Copy tracking number"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                  <Button type="button" variant="outline" className="h-9 rounded-xl px-3 text-xs" onClick={() => viewDispatchedOrder(order)}>
+                    View
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        ) : (
+          <Card className="rounded-3xl border border-slate-100 bg-white p-6 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Truck className="mx-auto h-6 w-6 text-slate-300" />
+            <p className="mt-2 text-sm text-slate-500">No orders are dispatched yet. Orders appear here automatically once their status changes to Dispatch.</p>
+          </Card>
+        )}
+      </div>
+
       {activeResult ? (
         <div className="space-y-4">
           <Card className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
@@ -260,7 +409,18 @@ export function TrackPage() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tracking Number</p>
-                <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{activeResult.trackingNumber}</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{activeResult.trackingNumber}</p>
+                  <button
+                    type="button"
+                    onClick={() => copyTrackingNumber(activeResult.trackingNumber)}
+                    className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-800"
+                    aria-label="Copy tracking number"
+                    title="Copy tracking number"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
               <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Current Location</p>
@@ -316,12 +476,28 @@ export function TrackPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Courier Company</label>
-            <Input
-              className="h-11 rounded-2xl"
-              placeholder="e.g. Blue Dart, DTDC, Delhivery"
-              value={shipmentForm.courierCompany}
-              onChange={(e) => setShipmentForm((f) => ({ ...f, courierCompany: e.target.value }))}
-            />
+            <div className="relative">
+              <select
+                className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                value={isManualCourier ? MANUAL_COURIER_VALUE : shipmentForm.courierCompany}
+                onChange={(e) => handleCourierSelectChange(e.target.value)}
+              >
+                {courierPresets.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+                <option value={MANUAL_COURIER_VALUE}>Other (Enter manually)</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            </div>
+            {isManualCourier ? (
+              <Input
+                className="mt-2 h-11 rounded-2xl"
+                placeholder="Type courier company name"
+                value={shipmentForm.courierCompany}
+                onChange={(e) => setShipmentForm((f) => ({ ...f, courierCompany: e.target.value }))}
+                autoFocus
+              />
+            ) : null}
           </div>
 
           <div>
@@ -377,7 +553,7 @@ export function TrackPage() {
                 <button
                   type="button"
                   className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-slate-700"
-                  onClick={() => deleteShipment(s.id)}
+                  onClick={() => requestDeleteShipment(s.id)}
                   aria-label="Delete shipment"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -405,6 +581,16 @@ export function TrackPage() {
           ))}
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={deleteShipmentId !== null}
+        title="Delete this shipment history?"
+        description="This will permanently remove this saved shipment entry. This cannot be undone."
+        confirmLabel="Yes"
+        cancelLabel="No"
+        onConfirm={confirmDeleteShipment}
+        onCancel={cancelDeleteShipment}
+      />
     </div>
   );
 }

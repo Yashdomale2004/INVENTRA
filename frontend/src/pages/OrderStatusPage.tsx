@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { getErrorMessage } from "../lib/errors";
 import { INVENTORY_SYNC_EVENT, notifyInventorySync } from "../lib/inventorySync";
-import { isNotificationsEnabled, saveNotification } from "../lib/notificationsStorage";
+import { notifyOrderDelivered } from "../lib/notificationsStorage";
 import { setSelectedTrackingNumber, type OrderStatus } from "../lib/orderStorage";
 import { fetchEnquiries, updateEnquiryStatus, type EnquiryRecord } from "../services/enquiries";
 
@@ -108,15 +108,8 @@ export function OrderStatusPage() {
       notifyInventorySync();
       toast.success("Order status saved.");
 
-      if (newStatus === "Received" && selectedOrder.orderStatus === "Dispatch" && isNotificationsEnabled()) {
-        saveNotification({
-          id: crypto.randomUUID(),
-          title: "📦 Parcel Received Successfully",
-          message: "The parcel has been delivered to the customer. Order status has been updated to 'Received'.",
-          notification_type: "delivery",
-          is_read: false,
-          created_at: new Date().toISOString(),
-        });
+      if (newStatus === "Received") {
+        notifyOrderDelivered(updatedOrder.orderId);
       }
     } catch (error) {
       console.error("[OrderStatusPage] handleStatusChange failed", error);

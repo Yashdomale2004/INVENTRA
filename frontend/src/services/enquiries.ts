@@ -99,6 +99,21 @@ export async function fetchPendingEnquiries(): Promise<EnquiryRecord[]> {
   return (data ?? []).map(mapRow);
 }
 
+export async function fetchDispatchedEnquiries(): Promise<EnquiryRecord[]> {
+  const { data, error } = await supabase
+    .from("enquiries")
+    .select(SELECT_COLUMNS)
+    .eq("order_status", "Dispatch")
+    .eq("hidden", false)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    logSupabaseError("fetchDispatchedEnquiries", error);
+    throw error;
+  }
+  return (data ?? []).map(mapRow);
+}
+
 export async function hideEnquiry(id: string): Promise<void> {
   const userId = await getCurrentUserId();
 

@@ -1,4 +1,4 @@
-import { Box, CheckCircle2, CircleHelp, Download, Eye, Lock, Minus, Pencil, Plus, Search, Trash2, Truck, X, ZoomIn } from "lucide-react";
+import { Box, CheckCircle2, Download, Eye, Lock, Minus, Pencil, Plus, Search, Trash2, Truck, X, ZoomIn } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -7,6 +7,8 @@ import { Card } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { useAuth } from "../contexts/AuthContext";
 import { getErrorMessage } from "../lib/errors";
+import { notifyInventorySync } from "../lib/inventorySync";
+import { notifyOrderDelivered } from "../lib/notificationsStorage";
 import {
   ORDER_STATUSES,
   createEmptyCombination,
@@ -80,6 +82,127 @@ function getPdfStatusColors(status: OrderDisplayStatus): { bg: string; text: str
     case "Delivered": return { bg: "#d1fae5", text: "#065f46" };
     default: return { bg: "#e2e8f0", text: "#334155" };
   }
+}
+
+const PDF_STYLES = `
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 116px 28px 64px; color: #0f172a; background: #ffffff; }
+
+  .pdf-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 28px;
+    background: linear-gradient(135deg, #2563eb, #06b6d4);
+  }
+  .pdf-header .badge {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 20px;
+    color: #ffffff;
+  }
+  .pdf-header .brand { font-weight: 800; font-size: 19px; letter-spacing: 0.03em; color: #ffffff; }
+  .pdf-header .tagline { font-size: 11px; color: rgba(255, 255, 255, 0.85); margin-top: 1px; }
+
+  .pdf-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 28px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 10px;
+    color: #64748b;
+    background: #ffffff;
+  }
+
+  .report-title { font-size: 21px; margin: 0 0 4px; color: #0f172a; }
+  .report-subtitle { font-size: 12px; color: #64748b; margin: 0 0 20px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  thead th {
+    background: #1d4ed8;
+    color: #ffffff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
+    padding: 10px 8px;
+    text-align: left;
+  }
+  tbody td { padding: 9px 8px; border-bottom: 1px solid #e2e8f0; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  .order-id { font-weight: 700; color: #1d4ed8; }
+  .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 20px 0; }
+  .detail-item { background: #f8fafc; border-radius: 12px; padding: 12px 14px; }
+  .detail-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin: 0 0 4px; }
+  .detail-item .value { font-size: 13px; font-weight: 700; color: #0f172a; margin: 0; }
+  .detail-item.full { grid-column: 1 / -1; }
+
+  .section-heading { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin: 24px 0 10px; }
+  .combo-row { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 12px; }
+  .combo-row .brand-name { font-weight: 700; color: #0f172a; }
+  .empty-note { font-size: 12px; color: #64748b; }
+
+  @page { margin-top: 130px; margin-bottom: 60px; }
+`;
+
+function pdfHeaderHtml(): string {
+  return `
+    <div class="pdf-header">
+      <div class="badge">I</div>
+      <div>
+        <div class="brand">INVENTRA</div>
+        <div class="tagline">Inventory &amp; Parcel Tracking</div>
+      </div>
+    </div>
+  `;
+}
+
+function pdfFooterHtml(rightText: string): string {
+  return `
+    <div class="pdf-footer">
+      <span>INVENTRA &mdash; Inventory &amp; Parcel Tracking</span>
+      <span>${rightText}</span>
+    </div>
+  `;
+}
+
+function pdfDocumentHtml(title: string, footerRight: string, bodyHtml: string): string {
+  return `
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <style>${PDF_STYLES}</style>
+      </head>
+      <body>
+        ${pdfHeaderHtml()}
+        ${pdfFooterHtml(footerRight)}
+        ${bodyHtml}
+      </body>
+    </html>
+  `;
 }
 
 function formatShortDate(value: string) {
@@ -167,7 +290,8 @@ export function HomePage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"All" | OrderDisplayStatus>("All");
+  const [isDeliveredOpen, setIsDeliveredOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"All" | Exclude<OrderDisplayStatus, "Delivered">>("All");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customRange, setCustomRange] = useState({ start: "", end: "" });
   const [searchTerm, setSearchTerm] = useState("");
@@ -244,10 +368,14 @@ export function HomePage() {
       .finally(() => setIsHistoryLoading(false));
   };
 
+  // Order History shows only active/in-progress orders; delivered orders move to their own section.
+  const activeHistory = useMemo(() => history.filter((entry) => entry.status !== "Delivered"), [history]);
+  const deliveredOrders = useMemo(() => history.filter((entry) => entry.status === "Delivered"), [history]);
+
   const filteredHistory = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
-    return history.filter((entry) => {
+    return activeHistory.filter((entry) => {
       const matchesStatus = statusFilter === "All" || entry.status === statusFilter;
       const matchesSearch =
         !query ||
@@ -263,7 +391,7 @@ export function HomePage() {
       const matchesDate = matchesDateFilter(entry.date, dateFilter, customRange);
       return matchesStatus && matchesSearch && matchesDate;
     });
-  }, [history, statusFilter, dateFilter, customRange, searchTerm, searchField]);
+  }, [activeHistory, statusFilter, dateFilter, customRange, searchTerm, searchField]);
 
   const exportHistory = (format: "excel" | "pdf") => {
     if (format === "excel") {
@@ -316,123 +444,90 @@ export function HomePage() {
         })
         .join("");
 
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Order History</title>
-            <style>
-              * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 116px 28px 64px; color: #0f172a; background: #ffffff; }
+      const bodyHtml = `
+        <h1 class="report-title">Order History Report</h1>
+        <p class="report-subtitle">Generated on ${generatedOn} &bull; ${orderCountLabel}</p>
 
-              .pdf-header {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 18px 28px;
-                background: linear-gradient(135deg, #2563eb, #06b6d4);
-              }
-              .pdf-header .badge {
-                width: 42px;
-                height: 42px;
-                flex-shrink: 0;
-                border-radius: 12px;
-                background: rgba(255, 255, 255, 0.2);
-                border: 1px solid rgba(255, 255, 255, 0.45);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: 800;
-                font-size: 20px;
-                color: #ffffff;
-              }
-              .pdf-header .brand { font-weight: 800; font-size: 19px; letter-spacing: 0.03em; color: #ffffff; }
-              .pdf-header .tagline { font-size: 11px; color: rgba(255, 255, 255, 0.85); margin-top: 1px; }
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer Name</th>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Order Date</th>
+              <th>Status</th>
+              <th>Tracking Number</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
 
-              .pdf-footer {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                display: flex;
-                justify-content: space-between;
-                padding: 10px 28px;
-                border-top: 1px solid #e2e8f0;
-                font-size: 10px;
-                color: #64748b;
-                background: #ffffff;
-              }
-
-              .report-title { font-size: 21px; margin: 0 0 4px; color: #0f172a; }
-              .report-subtitle { font-size: 12px; color: #64748b; margin: 0 0 20px; }
-
-              table { width: 100%; border-collapse: collapse; font-size: 11px; }
-              thead th {
-                background: #1d4ed8;
-                color: #ffffff;
-                text-transform: uppercase;
-                letter-spacing: 0.04em;
-                font-size: 10px;
-                padding: 10px 8px;
-                text-align: left;
-              }
-              tbody td { padding: 9px 8px; border-bottom: 1px solid #e2e8f0; }
-              tbody tr:nth-child(even) { background: #f8fafc; }
-              .order-id { font-weight: 700; color: #1d4ed8; }
-              .status-badge {
-                display: inline-block;
-                padding: 3px 10px;
-                border-radius: 999px;
-                font-size: 10px;
-                font-weight: 700;
-              }
-
-              @page { margin-top: 130px; margin-bottom: 60px; }
-            </style>
-          </head>
-          <body>
-            <div class="pdf-header">
-              <div class="badge">I</div>
-              <div>
-                <div class="brand">INVENTRA</div>
-                <div class="tagline">Inventory &amp; Parcel Tracking</div>
-              </div>
-            </div>
-
-            <div class="pdf-footer">
-              <span>INVENTRA &mdash; Inventory &amp; Parcel Tracking</span>
-              <span>Generated on ${generatedOn} &bull; ${orderCountLabel}</span>
-            </div>
-
-            <h1 class="report-title">Order History Report</h1>
-            <p class="report-subtitle">Generated on ${generatedOn} &bull; ${orderCountLabel}</p>
-
-            <table>
-              <thead>
-                <tr>
-                  <th>Order ID</th>
-                  <th>Customer Name</th>
-                  <th>Product</th>
-                  <th>Quantity</th>
-                  <th>Order Date</th>
-                  <th>Status</th>
-                  <th>Tracking Number</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </body>
-        </html>
-      `);
+      printWindow.document.write(
+        pdfDocumentHtml("Order History", `Generated on ${generatedOn} &bull; ${orderCountLabel}`, bodyHtml)
+      );
       printWindow.document.close();
       printWindow.focus();
       printWindow.print();
     }
 
     setExportMenuOpen(false);
+  };
+
+  const downloadOrderPdf = (order: EnquiryRecord) => {
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) return;
+
+    const generatedOn = new Date().toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const displayStatus = toDisplayStatus(order.orderStatus);
+    const { bg, text } = getPdfStatusColors(displayStatus);
+    const quantity = getOrderQuantity(order);
+
+    const comboRows = order.combinations.length
+      ? order.combinations
+          .map(
+            (combination) => `
+              <div class="combo-row">
+                <span class="brand-name">${escapeHtml(combination.brand)}</span>
+                <span>S: ${combination.quantities.S} &nbsp; M: ${combination.quantities.M} &nbsp; L: ${combination.quantities.L} &nbsp; XL: ${combination.quantities.XL}</span>
+              </div>
+            `
+          )
+          .join("")
+      : `<p class="empty-note">No brand/size breakdown recorded.</p>`;
+
+    const bodyHtml = `
+      <h1 class="report-title">Order Receipt</h1>
+      <p class="report-subtitle">${escapeHtml(order.orderId)} &bull; Generated on ${generatedOn}</p>
+
+      <div class="detail-grid">
+        <div class="detail-item"><p class="label">Order ID</p><p class="value">${escapeHtml(order.orderId)}</p></div>
+        <div class="detail-item"><p class="label">Status</p><p class="value"><span class="status-badge" style="background:${bg};color:${text};">${displayStatus}</span></p></div>
+        <div class="detail-item"><p class="label">Customer Name</p><p class="value">${escapeHtml(order.customerName)}</p></div>
+        <div class="detail-item"><p class="label">Assigner</p><p class="value">${escapeHtml(order.assignerName)}</p></div>
+        <div class="detail-item"><p class="label">Order Date</p><p class="value">${formatShortDate(order.createdAt)}</p></div>
+        <div class="detail-item"><p class="label">Delivery Date</p><p class="value">${order.deliveryDate ? formatShortDate(order.deliveryDate) : "-"}</p></div>
+        <div class="detail-item"><p class="label">Tracking Number</p><p class="value">${escapeHtml(order.trackingNumber || "-")}</p></div>
+        <div class="detail-item"><p class="label">Total Quantity</p><p class="value">${quantity} pcs</p></div>
+        <div class="detail-item full"><p class="label">Custom Requirement</p><p class="value">${escapeHtml(order.customRequirement || "-")}</p></div>
+        <div class="detail-item full"><p class="label">Note / Remarks</p><p class="value">${escapeHtml(order.notes || "-")}</p></div>
+      </div>
+
+      <p class="section-heading">Brand / Size / Quantity</p>
+      ${comboRows}
+    `;
+
+    printWindow.document.write(pdfDocumentHtml(`Order ${order.orderId}`, `Generated on ${generatedOn}`, bodyHtml));
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   };
 
   const handleWorkflowAdvance = async (order: EnquiryRecord, nextStatus: OrderStatus) => {
@@ -445,6 +540,10 @@ export function HomePage() {
       const deliveryDate = nextStatus === "Received" ? new Date().toISOString().slice(0, 10) : order.deliveryDate;
       await updateEnquiryStatus(order.id, { orderStatus: nextStatus, statusHistory: nextHistory, deliveryDate });
       await refreshHistory();
+      notifyInventorySync();
+      if (nextStatus === "Received" && order.orderStatus !== "Received") {
+        notifyOrderDelivered(order.orderId);
+      }
     } catch (err) {
       toast.error(getErrorMessage(err, "Failed to update status."));
     } finally {
@@ -562,6 +661,10 @@ export function HomePage() {
       });
 
       await refreshHistory();
+      notifyInventorySync();
+      if (statusChanged && editForm.orderStatus === "Received") {
+        notifyOrderDelivered(editOrder.orderId);
+      }
       toast.success("Order updated.");
       closeEditOrder();
     } catch (error) {
@@ -611,6 +714,21 @@ export function HomePage() {
           <div className="flex items-start gap-4">
             <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
             <div>
+              <h2 className="text-lg font-bold text-slate-900">Stock Up</h2>
+              <p className="mt-2 text-sm text-slate-500">Add new stock received from distributors.</p>
+              <div className="mt-4">
+                <Link to="/stock-up" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
+                  <Box className="h-4 w-4" /> Open Stock Up
+                </Link>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
+            <div>
               <h2 className="text-lg font-bold text-slate-900">Enquiry</h2>
               <p className="mt-2 text-sm text-slate-500">Capture and manage customer inventory assignments.</p>
               <div className="mt-4">
@@ -621,21 +739,6 @@ export function HomePage() {
                 >
                   <Search className="h-4 w-4" /> Open Enquiry
                 </button>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Stock Up</h2>
-              <p className="mt-2 text-sm text-slate-500">Add new stock received from distributors.</p>
-              <div className="mt-4">
-                <Link to="/stock-up" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
-                  <Box className="h-4 w-4" /> Open Stock Up
-                </Link>
               </div>
             </div>
           </div>
@@ -752,20 +855,20 @@ export function HomePage() {
 
         <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4">
-            <button
-              type="button"
-              onClick={() => setIsHistoryOpen((open) => !open)}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
-            >
-              <div>
+            <div className="flex items-start gap-4">
+              <div className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full bg-blue-600" />
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen((open) => !open)}
+                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
+              >
                 <h2 className="text-lg font-bold text-slate-900">Order History</h2>
-                <p className="mt-1 text-sm text-slate-500">Real saved orders only.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">{history.length}</span>
-                <span className="text-slate-500">{isHistoryOpen ? "▲" : "▼"}</span>
-              </div>
-            </button>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">{activeHistory.length}</span>
+                  <span className="text-slate-500">{isHistoryOpen ? "▲" : "▼"}</span>
+                </div>
+              </button>
+            </div>
 
             {isHistoryOpen ? (
               <>
@@ -816,14 +919,13 @@ export function HomePage() {
                 <div className="grid gap-3 md:grid-cols-[0.9fr_0.9fr]">
                   <select
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value as "All" | OrderDisplayStatus)}
+                    onChange={(event) => setStatusFilter(event.target.value as "All" | Exclude<OrderDisplayStatus, "Delivered">)}
                     className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400"
                   >
                     <option value="All">All</option>
                     <option value="New">New</option>
                     <option value="Printing">Printing</option>
                     <option value="Dispatch">Dispatch</option>
-                    <option value="Delivered">Delivered</option>
                   </select>
 
                   <select
@@ -1033,17 +1135,71 @@ export function HomePage() {
         </Card>
 
         <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">More Info</h2>
-              <p className="mt-2 text-sm text-slate-500">View dashboard stats, profile, settings, and more.</p>
-              <div className="mt-4">
-                <Link to="/more" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
-                  <CircleHelp className="h-4 w-4" /> Open More Info
-                </Link>
-              </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start gap-4">
+              <div className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full bg-blue-600" />
+              <button
+                type="button"
+                onClick={() => setIsDeliveredOpen((open) => !open)}
+                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
+              >
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Delivered Orders</h2>
+                  <p className="mt-1 text-sm text-slate-500">Orders marked Received move here automatically.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">{deliveredOrders.length}</span>
+                  <span className="text-slate-500">{isDeliveredOpen ? "▲" : "▼"}</span>
+                </div>
+              </button>
             </div>
+
+            {isDeliveredOpen ? (
+              <div className="space-y-3">
+                {deliveredOrders.length ? (
+                  deliveredOrders.map((entry) => (
+                    <div key={entry.raw.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-900">{entry.orderId} · {entry.customerName}</p>
+                          <p className="truncate text-xs text-slate-500">{entry.product}{entry.quantity ? ` · ${entry.quantity} pcs` : ""}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                          Delivered
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600">
+                        <p><span className="text-slate-400">Order Date: </span>{formatShortDate(entry.date)}</p>
+                        <p><span className="text-slate-400">Delivered: </span>{entry.raw.deliveryDate ? formatShortDate(entry.raw.deliveryDate) : "-"}</p>
+                        <p className="col-span-2 truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => setDetailOrder(entry.raw)}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View Details
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadOrderPdf(entry.raw)}
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download PDF
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    No delivered orders yet.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
         </Card>
       </section>

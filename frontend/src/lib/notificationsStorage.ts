@@ -46,6 +46,17 @@ export function saveNotification(notification: NotificationItem) {
   window.dispatchEvent(new CustomEvent("inventra:notifications-updated"));
 }
 
+export function notifyOrderDelivered(orderId: string) {
+  saveNotification({
+    id: crypto.randomUUID(),
+    title: `📦 Order ${orderId} has been delivered.`,
+    message: "Marked as delivered and moved to Order History.",
+    notification_type: "delivery",
+    is_read: false,
+    created_at: new Date().toISOString(),
+  });
+}
+
 export function markNotificationRead(id: string) {
   const current = loadNotifications();
   const next = current.map((item) => (item.id === id ? { ...item, is_read: true } : item));

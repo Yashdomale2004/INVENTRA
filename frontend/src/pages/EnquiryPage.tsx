@@ -11,13 +11,12 @@ import { createEmptyCombination, type OrderStatus, type RequirementCombination }
 import { createEnquiry, fetchEnquiries, type EnquiryRecord } from "../services/enquiries";
 import { deductStockForEnquiry } from "../services/inventory";
 
-type AssignerName = "Raghav Sir" | "Devansh Sir";
 type BrandName = "Sunkool" | "Ceramic Shield" | "R S" | "Puma" | "Plain T-Shirts";
 type SizeName = "S" | "M" | "L" | "XL";
 
 type EnquiryForm = {
   customerName: string;
-  assignerName: AssignerName;
+  assignerName: string;
   customRequirement: string;
   combinations: RequirementCombination[];
   shippingImage: string;
@@ -28,6 +27,8 @@ type EnquiryForm = {
 const brandOptions: BrandName[] = ["Plain T-Shirts", "Sunkool", "Ceramic Shield", "R S", "Puma"];
 const sizeOptions: SizeName[] = ["S", "M", "L", "XL"];
 const enquiryOrderStatuses: OrderStatus[] = ["New", "Pending"];
+const assignerPresets = ["Raghav Sir", "Devansh Sir"] as const;
+const MANUAL_ASSIGNER_VALUE = "__manual__";
 
 const initialForm: EnquiryForm = {
   customerName: "",
@@ -43,9 +44,10 @@ export function EnquiryPage() {
   const [form, setForm] = useState<EnquiryForm>(initialForm);
   const [shippingImageFile, setShippingImageFile] = useState<File | null>(null);
   const [enquiries, setEnquiries] = useState<EnquiryRecord[]>([]);
-  const [errors, setErrors] = useState<{ customerName?: string; requirements?: string }>({});
+  const [errors, setErrors] = useState<{ customerName?: string; assignerName?: string; requirements?: string }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const [isManualAssigner, setIsManualAssigner] = useState(false);
 
   const customerNameHistory = useMemo(() => {
     const seen = new Set<string>();
@@ -99,6 +101,21 @@ export function EnquiryPage() {
   const selectCustomerName = (name: string) => {
     updateField("customerName", name);
     setShowCustomerSuggestions(false);
+  };
+
+  const handleAssignerSelectChange = (value: string) => {
+    if (value === MANUAL_ASSIGNER_VALUE) {
+      setIsManualAssigner(true);
+      updateField("assignerName", "");
+    } else {
+      setIsManualAssigner(false);
+      updateField("assignerName", value);
+    }
+  };
+
+  const updateManualAssignerName = (value: string) => {
+    updateField("assignerName", value);
+    setErrors((current) => ({ ...current, assignerName: undefined }));
   };
 
   const updateCombination = (id: string, patch: Partial<RequirementCombination>) => {
@@ -220,13 +237,18 @@ export function EnquiryPage() {
     setShippingImageFile(null);
     setErrors({});
     setShowCustomerSuggestions(false);
+    setIsManualAssigner(false);
   };
 
   const saveEnquiry = async () => {
-    const nextErrors: { customerName?: string; requirements?: string } = {};
+    const nextErrors: { customerName?: string; assignerName?: string; requirements?: string } = {};
 
     if (!form.customerName.trim()) {
       nextErrors.customerName = "Customer name is required.";
+    }
+
+    if (isManualAssigner && !form.assignerName.trim()) {
+      nextErrors.assignerName = "Enter the assigner name.";
     }
 
     const hasCustomRequirement = Boolean(form.customRequirement.trim());
@@ -239,7 +261,7 @@ export function EnquiryPage() {
       nextErrors.requirements = "Add a custom requirement or at least one brand-size quantity combination.";
     }
 
-    if (nextErrors.customerName || nextErrors.requirements) {
+    if (nextErrors.customerName || nextErrors.assignerName || nextErrors.requirements) {
       setErrors(nextErrors);
       toast.error("Please complete required fields.");
       return;
@@ -250,7 +272,7 @@ export function EnquiryPage() {
       const savedRecord = await createEnquiry(
         {
           customerName: form.customerName.trim(),
-          assignerName: form.assignerName,
+          assignerName: form.assignerName.trim(),
           customRequirement: form.customRequirement.trim(),
           combinations: validCombinations,
           trackingNumber: "",
@@ -327,14 +349,26 @@ export function EnquiryPage() {
             <div className="relative">
               <select
                 className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                value={form.assignerName}
-                onChange={(event) => updateField("assignerName", event.target.value as AssignerName)}
+                value={isManualAssigner ? MANUAL_ASSIGNER_VALUE : form.assignerName}
+                onChange={(event) => handleAssignerSelectChange(event.target.value)}
               >
-                <option value="Raghav Sir">Raghav Sir</option>
-                <option value="Devang Sir">Devang Sir</option>
+                {assignerPresets.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+                <option value={MANUAL_ASSIGNER_VALUE}>Other (Enter manually)</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             </div>
+            {isManualAssigner ? (
+              <Input
+                className="mt-2 h-11 rounded-2xl"
+                placeholder="Type assigner name"
+                value={form.assignerName}
+                onChange={(event) => updateManualAssignerName(event.target.value)}
+                autoFocus
+              />
+            ) : null}
+            {errors.assignerName ? <p className="mt-1 text-xs text-rose-500">{errors.assignerName}</p> : null}
           </div>
 
           <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-900/70">
