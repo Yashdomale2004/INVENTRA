@@ -1,0 +1,12 @@
+{
+  "info": {
+    "name": "INVENTRA Supabase Notes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [],
+  "variable": [
+    { "key": "supabaseUrl", "value": "https://your-project-ref.supabase.co" },
+    { "key": "anonKey", "value": "your-anon-key" },
+    { "key": "note", "value": "INVENTRA uses Supabase SDK directly (no custom REST backend)." }
+  ]
+}

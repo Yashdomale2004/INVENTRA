@@ -1,0 +1,16 @@
+# Python
+backend/__pycache__/
+backend/*.sqlite3
+backend/db.sqlite3
+backend/media/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+mobile/node_modules/
+
+# Env
+**/.env
+
+# Logs
+*.log
