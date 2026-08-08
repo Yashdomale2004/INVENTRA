@@ -14,7 +14,7 @@ import { createEnquiry, fetchEnquiries, type EnquiryRecord } from "../services/e
 import { deductStockForEnquiry, fetchInventoryByBrand, type BrandSizeStock } from "../services/inventory";
 
 type BrandName = "Sunkool" | "Ceramic Shield" | "R S" | "Puma" | "Plain T-Shirts";
-type SizeName = "S" | "M" | "L" | "XL";
+type SizeName = "S" | "M" | "L" | "XL" | "XXL";
 type BrandStockMap = Map<string, Map<SizeName, number>>;
 
 type EnquiryForm = {
@@ -29,7 +29,7 @@ type EnquiryForm = {
 };
 
 const brandOptions: BrandName[] = ["Plain T-Shirts", "Sunkool", "Ceramic Shield", "R S", "Puma"];
-const sizeOptions: SizeName[] = ["S", "M", "L", "XL"];
+const sizeOptions: SizeName[] = ["S", "M", "L", "XL", "XXL"];
 const enquiryOrderStatuses: OrderStatus[] = ["New", "Pending"];
 const assignerPresets = ["Raghav Sir", "Devansh Sir"] as const;
 const MANUAL_ASSIGNER_VALUE = "__manual__";
@@ -184,7 +184,7 @@ export function EnquiryPage() {
 
         const nextItem = { ...item, ...patch };
         if (patch.brand !== undefined) {
-          nextItem.quantities = { S: 0, M: 0, L: 0, XL: 0 };
+          nextItem.quantities = { S: 0, M: 0, L: 0, XL: 0, XXL: 0 };
         }
 
         return nextItem;
@@ -537,7 +537,7 @@ export function EnquiryPage() {
                     </div>
 
                     <div
-                      className={`transition-all duration-300 ${showSizes ? "mt-3 max-h-[360px] opacity-100" : "max-h-0 opacity-0"}`}
+                      className={`transition-all duration-300 ${showSizes ? "mt-3 max-h-[440px] opacity-100" : "max-h-0 opacity-0"}`}
                     >
                       {showSizes ? (
                         <div className="space-y-2">

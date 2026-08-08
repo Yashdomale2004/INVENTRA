@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { EmptyState } from "../components/shared/EmptyState";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { useLowStockAlerts } from "../hooks/useLowStockAlerts";
 import { loadNotifications, markNotificationRead, type NotificationItem } from "../lib/notificationsStorage";
+import { STOCK_STATUS_BADGE_CLASS, STOCK_STATUS_LABEL } from "../lib/stockStatus";
 
 export function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const { data: lowStockAlerts = [] } = useLowStockAlerts();
 
   useEffect(() => {
     setNotifications(loadNotifications());
@@ -18,7 +21,7 @@ export function NotificationsPage() {
     return () => window.removeEventListener("inventra:notifications-updated", handleNotificationsUpdated);
   }, []);
 
-  if (!notifications.length) {
+  if (!notifications.length && !lowStockAlerts.length) {
     return <EmptyState title="No Notifications" description="Inventory, shipment, and delivery alerts will appear here." />;
   }
 
@@ -30,6 +33,32 @@ export function NotificationsPage() {
           <p className="text-sm text-slate-500">Delivery updates and order alerts are saved here.</p>
         </div>
       </div>
+
+      {lowStockAlerts.length ? (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Low Stock Alerts ({lowStockAlerts.length})
+          </h3>
+          {lowStockAlerts.map((alert) => (
+            <Card key={alert.id} className="border-rose-200 dark:border-rose-900">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
+                    <span className="truncate">{alert.productName} ({alert.size})</span>
+                  </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Only {alert.currentStock} unit{alert.currentStock === 1 ? "" : "s"} left, below the minimum of {alert.minimumStock}.
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STOCK_STATUS_BADGE_CLASS[alert.status]}`}>
+                  {STOCK_STATUS_LABEL[alert.status]}
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
       <div className="space-y-3">
         {notifications.map((item) => (

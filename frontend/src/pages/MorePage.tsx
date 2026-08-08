@@ -65,7 +65,7 @@ export function MorePage() {
   ];
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-5 pb-8">
       <div className="space-y-1">
         <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100">More Info</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">Manage account details, preferences, and app settings in one place.</p>
@@ -137,7 +137,7 @@ export function MorePage() {
                 key={label}
                 type="button"
                 variant="outline"
-                className="flex h-full w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950"
                 onClick={onClick}
               >
                 {content}

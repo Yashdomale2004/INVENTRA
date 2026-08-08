@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card } from "../components/ui/card";
 import { INVENTORY_SYNC_EVENT, calculateInventorySnapshot, type InventorySnapshot } from "../lib/inventorySync";
 
-const sizeOrder = ["S", "M", "L", "XL"] as const;
+const sizeOrder = ["S", "M", "L", "XL", "XXL"] as const;
 
 type ExpandState = {
   plain: boolean;
@@ -15,7 +15,7 @@ type ExpandState = {
   rs: boolean;
 };
 
-function SizeRows({ values }: { values: Record<"S" | "M" | "L" | "XL", number> }) {
+function SizeRows({ values }: { values: Record<"S" | "M" | "L" | "XL" | "XXL", number> }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {sizeOrder.map((size) => (
@@ -29,20 +29,20 @@ function SizeRows({ values }: { values: Record<"S" | "M" | "L" | "XL", number> }
 }
 
 const emptySnapshot: InventorySnapshot = {
-  plain: { S: 0, M: 0, L: 0, XL: 0 },
+  plain: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
   printed: {
-    "Ceramic Shield": { S: 0, M: 0, L: 0, XL: 0 },
-    Sunkool: { S: 0, M: 0, L: 0, XL: 0 },
-    RS: { S: 0, M: 0, L: 0, XL: 0 },
+    "Ceramic Shield": { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
+    Sunkool: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
+    RS: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
   },
-  puma: { S: 0, M: 0, L: 0, XL: 0 },
-  rawPlain: { S: 0, M: 0, L: 0, XL: 0 },
+  puma: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
+  rawPlain: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
   rawPrinted: {
-    "Ceramic Shield": { S: 0, M: 0, L: 0, XL: 0 },
-    Sunkool: { S: 0, M: 0, L: 0, XL: 0 },
-    RS: { S: 0, M: 0, L: 0, XL: 0 },
+    "Ceramic Shield": { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
+    Sunkool: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
+    RS: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
   },
-  rawPuma: { S: 0, M: 0, L: 0, XL: 0 },
+  rawPuma: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
   totals: { plain: 0, printed: 0, puma: 0, overall: 0 },
   rawTotals: { plain: 0, printed: 0, puma: 0, overall: 0 },
 };

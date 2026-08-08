@@ -1,6 +1,6 @@
 import { fetchPendingEnquiries } from "../services/enquiries";
 
-type SizeName = "S" | "M" | "L" | "XL";
+type SizeName = "S" | "M" | "L" | "XL" | "XXL";
 
 type SizeStock = Record<SizeName, number>;
 
@@ -49,7 +49,7 @@ export type InventorySnapshot = {
 };
 
 function emptySizeStock(): SizeStock {
-  return { S: 0, M: 0, L: 0, XL: 0 };
+  return { S: 0, M: 0, L: 0, XL: 0, XXL: 0 };
 }
 
 function toSafeQuantity(value: unknown): number {
@@ -77,11 +77,11 @@ function normalizePrintedName(name: string): "Ceramic Shield" | "Sunkool" | "RS"
 }
 
 export function sumSizeStock(stock: SizeStock): number {
-  return stock.S + stock.M + stock.L + stock.XL;
+  return stock.S + stock.M + stock.L + stock.XL + stock.XXL;
 }
 
 function addSizeStock(target: SizeStock, size: string, qty: number) {
-  if (size === "S" || size === "M" || size === "L" || size === "XL") {
+  if (size === "S" || size === "M" || size === "L" || size === "XL" || size === "XXL") {
     target[size] += qty;
   }
 }
@@ -145,7 +145,7 @@ export async function calculateInventorySnapshot(): Promise<InventorySnapshot> {
       if (!combination.brand) continue;
 
       if (combination.brand === "Puma") {
-        for (const size of ["S", "M", "L", "XL"] as const) {
+        for (const size of ["S", "M", "L", "XL", "XXL"] as const) {
           puma[size] = Math.max(0, puma[size] - toSafeQuantity(combination.quantities?.[size]));
         }
         continue;
@@ -153,7 +153,7 @@ export async function calculateInventorySnapshot(): Promise<InventorySnapshot> {
 
       const printedProduct = normalizePrintedName(combination.brand);
       if (printedProduct) {
-        for (const size of ["S", "M", "L", "XL"] as const) {
+        for (const size of ["S", "M", "L", "XL", "XXL"] as const) {
           printed[printedProduct][size] = Math.max(
             0,
             printed[printedProduct][size] - toSafeQuantity(combination.quantities?.[size])

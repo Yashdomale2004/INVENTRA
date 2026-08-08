@@ -1,4 +1,4 @@
-export type SizeName = "S" | "M" | "L" | "XL";
+export type SizeName = "S" | "M" | "L" | "XL" | "XXL";
 export type SizeQuantities = Record<SizeName, number>;
 export type BrandName = "Sunkool" | "Ceramic Shield" | "R S" | "Puma" | "Plain T-Shirts";
 
@@ -55,6 +55,7 @@ export function createEmptyCombination(): RequirementCombination {
       M: 0,
       L: 0,
       XL: 0,
+      XXL: 0,
     },
   };
 }

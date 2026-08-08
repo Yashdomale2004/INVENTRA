@@ -1,4 +1,5 @@
 import { getCurrentUserId, supabase } from "../lib/supabase";
+import { getStockStatus, isLowStockStatus, type StockStatus } from "../lib/stockStatus";
 import type { Brand, Category, Distributor, Parcel, Product, ProductSize, StockTransaction, Supplier } from "../types";
 
 export async function fetchProducts() {
@@ -635,7 +636,7 @@ export async function deductStockForEnquiry(
 
 export type BrandSizeStock = {
   brandName: string;
-  sizes: { size: string; stock: number }[];
+  sizes: { size: string; stock: number; minimumStock: number; status: StockStatus }[];
   total: number;
 };
 
@@ -653,29 +654,39 @@ export async function fetchInventoryByBrand(): Promise<BrandSizeStock[]> {
   }
   if (!brandByProduct.size) return [];
 
+  // No current_stock filter here — zero-stock sizes must still surface so the
+  // dashboard can show them as OUT OF STOCK instead of silently disappearing.
   const { data: sizeRows, error: sizesError } = await supabase
     .from("product_sizes")
-    .select("product_id, size, current_stock")
-    .in("product_id", [...brandByProduct.keys()])
-    .gt("current_stock", 0);
+    .select("product_id, size, current_stock, minimum_stock")
+    .in("product_id", [...brandByProduct.keys()]);
   if (sizesError) throw sizesError;
 
-  // Aggregate stock per brand per size
-  const byBrand = new Map<string, Map<string, number>>();
+  // Aggregate stock and minimum threshold per brand per size
+  const byBrand = new Map<string, Map<string, { stock: number; minimumStock: number }>>();
   for (const row of sizeRows ?? []) {
     const brandName = brandByProduct.get(row.product_id);
     if (!brandName) continue;
     if (!byBrand.has(brandName)) byBrand.set(brandName, new Map());
     const sizeMap = byBrand.get(brandName)!;
-    sizeMap.set(row.size, (sizeMap.get(row.size) ?? 0) + Number(row.current_stock ?? 0));
+    const existing = sizeMap.get(row.size) ?? { stock: 0, minimumStock: 0 };
+    sizeMap.set(row.size, {
+      stock: existing.stock + Number(row.current_stock ?? 0),
+      minimumStock: existing.minimumStock + Number(row.minimum_stock ?? 0),
+    });
   }
 
-  const sizeOrder = ["S", "M", "L", "XL"];
+  const sizeOrder = ["S", "M", "L", "XL", "XXL"];
 
   return [...byBrand.entries()]
     .map(([brandName, sizeMap]) => {
       const sizes = [...sizeMap.entries()]
-        .map(([size, stock]) => ({ size, stock }))
+        .map(([size, { stock, minimumStock }]) => ({
+          size,
+          stock,
+          minimumStock,
+          status: getStockStatus(stock),
+        }))
         .sort((a, b) => {
           const ai = sizeOrder.indexOf(a.size);
           const bi = sizeOrder.indexOf(b.size);
@@ -684,6 +695,120 @@ export async function fetchInventoryByBrand(): Promise<BrandSizeStock[]> {
       return { brandName, sizes, total: sizes.reduce((s, r) => s + r.stock, 0) };
     })
     .sort((a, b) => a.brandName.localeCompare(b.brandName));
+}
+
+export type LowStockAlert = {
+  id: string;
+  productName: string;
+  size: string;
+  currentStock: number;
+  minimumStock: number;
+  status: StockStatus;
+};
+
+/** Live view of every product/size currently at or below its configured minimum. */
+export async function fetchLowStockAlerts(): Promise<LowStockAlert[]> {
+  const { data, error } = await supabase
+    .from("product_sizes")
+    .select("id, size, current_stock, minimum_stock, products:product_id(name, deleted_at)")
+    .order("current_stock", { ascending: true });
+  if (error) throw error;
+
+  return (data ?? [])
+    .filter((row: any) => row.products && !row.products.deleted_at)
+    .map((row: any) => {
+      const currentStock = Number(row.current_stock ?? 0);
+      const minimumStock = Number(row.minimum_stock ?? 0);
+      return {
+        id: row.id,
+        productName: row.products?.name ?? "Unknown product",
+        size: row.size,
+        currentStock,
+        minimumStock,
+        status: getStockStatus(currentStock),
+      };
+    })
+    .filter((alert) => isLowStockStatus(alert.status));
+}
+
+export type ProductSizeStock = {
+  size: string;
+  stock: number;
+  minimumStock: number;
+  status: StockStatus;
+};
+
+export type ProductStockOverview = {
+  id: string;
+  name: string;
+  brandName: string;
+  total: number;
+  sizes: ProductSizeStock[];
+};
+
+export type DashboardOverview = {
+  totalStock: number;
+  totalProducts: number;
+  totalBrands: number;
+  statusCounts: Record<StockStatus, number>;
+  products: ProductStockOverview[];
+};
+
+const DASHBOARD_SIZE_ORDER = ["S", "M", "L", "XL", "XXL"];
+
+/** Product-wise stock health for the dashboard: per-size quantities, status, and aggregate counts. */
+export async function fetchDashboardOverview(): Promise<DashboardOverview> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, brands:brand_id(name), product_sizes(size, current_stock, minimum_stock)")
+    .is("deleted_at", null)
+    .order("name");
+  if (error) throw error;
+
+  const statusCounts: Record<StockStatus, number> = { healthy: 0, warning: 0, critical: 0, out_of_stock: 0 };
+  const brandNames = new Set<string>();
+  let totalStock = 0;
+
+  const products = (data ?? [])
+    .map((row: any) => {
+      const brandName = row.brands?.name ?? "Unbranded";
+      brandNames.add(brandName);
+
+      // Always show every standard T-shirt size, even if this product has no
+      // product_sizes row for it yet — a missing row reads as 0 in stock.
+      const bySize = new Map<string, { stock: number; minimumStock: number }>();
+      for (const sizeRow of row.product_sizes ?? []) {
+        bySize.set(sizeRow.size, {
+          stock: Number(sizeRow.current_stock ?? 0),
+          minimumStock: Number(sizeRow.minimum_stock ?? 0),
+        });
+      }
+
+      const sizes: ProductSizeStock[] = DASHBOARD_SIZE_ORDER.map((size) => {
+        const { stock, minimumStock } = bySize.get(size) ?? { stock: 0, minimumStock: 0 };
+        const status = getStockStatus(stock);
+        statusCounts[status] += 1;
+        totalStock += stock;
+        return { size, stock, minimumStock, status };
+      });
+
+      return {
+        id: row.id,
+        name: row.name,
+        brandName,
+        total: sizes.reduce((sum, s) => sum + s.stock, 0),
+        sizes,
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
+  return {
+    totalStock,
+    totalProducts: products.length,
+    totalBrands: brandNames.size,
+    statusCounts,
+    products,
+  };
 }
 
 // ─── Stock Up to Supabase ────────────────────────────────────────────────────

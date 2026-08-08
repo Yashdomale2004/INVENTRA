@@ -10,7 +10,7 @@ import { getErrorMessage } from "../lib/errors";
 import { STOCK_DRAFT_KEY, STOCK_LOG_KEY, notifyInventorySync } from "../lib/inventorySync";
 import { stockUpToSupabase, type StockUpEntry } from "../services/inventory";
 
-type SizeName = "S" | "M" | "L" | "XL";
+type SizeName = "S" | "M" | "L" | "XL" | "XXL";
 type SizeQuantities = Record<SizeName, string>;
 type CategoryKey = "plain" | "printed" | "puma";
 
@@ -23,7 +23,7 @@ type StoredStockEntry = {
   createdAt: string;
 };
 
-const sizeOrder: SizeName[] = ["S", "M", "L", "XL"];
+const sizeOrder: SizeName[] = ["S", "M", "L", "XL", "XXL"];
 const printedProducts = ["Ceramic Shield", "Sunkool", "RS"];
 
 // Maps Stock Up category labels to Supabase category names
@@ -34,7 +34,7 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 function emptyQuantities(): SizeQuantities {
-  return { S: "0", M: "0", L: "0", XL: "0" };
+  return { S: "0", M: "0", L: "0", XL: "0", XXL: "0" };
 }
 
 function quantityToNumber(value: string): number {
@@ -229,7 +229,7 @@ export function StockUpPage() {
               <ChevronDown className={`h-4 w-4 text-slate-500 transition ${expanded.plain ? "rotate-180" : ""}`} />
             </button>
 
-            <div className={`transition-all duration-300 ${expanded.plain ? "max-h-[560px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
+            <div className={`transition-all duration-300 ${expanded.plain ? "max-h-[640px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
               {renderSizeInputs("plain", plainQuantities)}
             </div>
           </section>
@@ -244,7 +244,7 @@ export function StockUpPage() {
               <ChevronDown className={`h-4 w-4 text-slate-500 transition ${expanded.printed ? "rotate-180" : ""}`} />
             </button>
 
-            <div className={`transition-all duration-300 ${expanded.printed ? "max-h-[560px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
+            <div className={`transition-all duration-300 ${expanded.printed ? "max-h-[640px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Select Product</label>
               <Select value={printedProduct} onChange={(event) => setPrintedProduct(event.target.value)}>
                 <option value="">Choose printed product</option>
@@ -269,7 +269,7 @@ export function StockUpPage() {
               <ChevronDown className={`h-4 w-4 text-slate-500 transition ${expanded.puma ? "rotate-180" : ""}`} />
             </button>
 
-            <div className={`transition-all duration-300 ${expanded.puma ? "max-h-[560px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
+            <div className={`transition-all duration-300 ${expanded.puma ? "max-h-[640px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
               {renderSizeInputs("puma", pumaQuantities)}
             </div>
           </section>

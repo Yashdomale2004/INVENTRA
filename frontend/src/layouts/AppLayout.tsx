@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useLowStockAlerts } from "../hooks/useLowStockAlerts";
 import { cn } from "../lib/utils";
 import { getUnreadCount } from "../lib/notificationsStorage";
 
@@ -24,6 +25,7 @@ export function AppLayout() {
     navigate("/login");
   };
   const [unreadCount, setUnreadCount] = useState(0);
+  const { data: lowStockAlerts = [] } = useLowStockAlerts();
 
   useEffect(() => {
     setUnreadCount(getUnreadCount());
@@ -35,6 +37,20 @@ export function AppLayout() {
       window.removeEventListener("inventra:notifications-updated", handleNotificationsChanged);
     };
   }, []);
+
+  const bellCount = unreadCount + lowStockAlerts.length;
+
+  const isNotificationsOpen = location.pathname === "/notifications" || location.pathname.startsWith("/notifications/");
+  const [returnPath, setReturnPath] = useState("/home");
+
+  const handleBellClick = () => {
+    if (isNotificationsOpen) {
+      navigate(returnPath);
+    } else {
+      setReturnPath(location.pathname);
+      navigate("/notifications");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
@@ -50,14 +66,20 @@ export function AppLayout() {
             </Link>
 
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <Link to="/notifications" className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+              <button
+                type="button"
+                onClick={handleBellClick}
+                aria-label={isNotificationsOpen ? "Close notifications" : "Open notifications"}
+                aria-pressed={isNotificationsOpen}
+                className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              >
                 <Bell className="h-4 w-4" />
-                {unreadCount > 0 ? (
+                {bellCount > 0 ? (
                   <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white">
-                    {unreadCount}
+                    {bellCount}
                   </span>
                 ) : null}
-              </Link>
+              </button>
               <div className="flex items-center gap-2 sm:block sm:text-right">
                 <div className="hidden sm:block">
                   <p className="text-xs text-slate-500 dark:text-slate-400">Signed in as</p>

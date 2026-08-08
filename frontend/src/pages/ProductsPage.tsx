@@ -59,7 +59,7 @@ function ProductForm({ initial, onCancel, onSaved }: { initial?: Product | null;
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newBrandName, setNewBrandName] = useState("");
 
-  const sizePresets = ["S", "M", "L", "XL"];
+  const sizePresets = ["S", "M", "L", "XL", "XXL"];
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<ProductValues>({
     resolver: zodResolver(productSchema) as Resolver<ProductValues>,
@@ -223,7 +223,7 @@ function ProductForm({ initial, onCancel, onSaved }: { initial?: Product | null;
             </button>
           ))}
         </div>
-        {!selectedSizes.length && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Select one or more standard sizes: S, M, L, XL.</p>}
+        {!selectedSizes.length && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Select one or more standard sizes: S, M, L, XL, XXL.</p>}
       </div>
       <div className="md:col-span-2">
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Description</label>

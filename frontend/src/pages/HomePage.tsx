@@ -526,7 +526,7 @@ export function HomePage() {
             (combination) => `
               <div class="combo-row">
                 <span class="brand-name">${escapeHtml(combination.brand)}</span>
-                <span>S: ${combination.quantities.S} &nbsp; M: ${combination.quantities.M} &nbsp; L: ${combination.quantities.L} &nbsp; XL: ${combination.quantities.XL}</span>
+                <span>S: ${combination.quantities.S} &nbsp; M: ${combination.quantities.M} &nbsp; L: ${combination.quantities.L} &nbsp; XL: ${combination.quantities.XL} &nbsp; XXL: ${combination.quantities.XXL}</span>
               </div>
             `
           )
@@ -758,7 +758,6 @@ export function HomePage() {
       <section className="overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-600 to-cyan-500 p-5 text-white shadow-lg shadow-blue-200/70">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Inventra</p>
         <h1 className="mt-1 text-2xl font-extrabold">Welcome, {user?.first_name || user?.username}</h1>
-        <p className="mt-1 text-sm text-blue-50">Maintain T-shirt inventory, stock updates, and parcel tracking from one place.</p>
       </section>
 
       <section className="relative space-y-6">
@@ -1236,7 +1235,7 @@ export function HomePage() {
                     <div key={combination.id} className="rounded-xl bg-white px-3 py-2 dark:bg-slate-900">
                       <p className="font-semibold text-slate-900 dark:text-slate-100">{combination.brand}</p>
                       <p className="text-xs text-slate-600 dark:text-slate-300">
-                        S: {combination.quantities.S} | M: {combination.quantities.M} | L: {combination.quantities.L} | XL: {combination.quantities.XL}
+                        S: {combination.quantities.S} | M: {combination.quantities.M} | L: {combination.quantities.L} | XL: {combination.quantities.XL} | XXL: {combination.quantities.XXL}
                       </p>
                     </div>
                   ))}
