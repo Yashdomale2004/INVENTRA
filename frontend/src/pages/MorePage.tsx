@@ -65,22 +65,22 @@ export function MorePage() {
   ];
 
   return (
-    <div className="w-full space-y-5 pb-8">
+    <div className="w-full space-y-3 pb-8 sm:space-y-5">
       <div className="space-y-1">
-        <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100">More Info</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Manage account details, preferences, and app settings in one place.</p>
+        <h1 className="text-xl font-black text-slate-900 dark:text-slate-100 sm:text-3xl">More Info</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Manage account details, preferences, and app settings in one place.</p>
       </div>
 
-      <Card className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-900 dark:bg-slate-800 dark:text-slate-100">
-              {userInitials || <UserRound className="h-6 w-6" />}
+      <Card className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:rounded-3xl sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-base font-black text-slate-900 dark:bg-slate-800 dark:text-slate-100 sm:h-16 sm:w-16 sm:rounded-2xl sm:text-xl">
+              {userInitials || <UserRound className="h-5 w-5 sm:h-6 sm:w-6" />}
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Account</p>
-              <h2 className="truncate text-xl font-semibold text-slate-900 dark:text-slate-100">{userName}</h2>
-              <p className="truncate text-sm text-slate-500 dark:text-slate-400">{user?.email ?? "No email provided"}</p>
+              <h2 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">{userName}</h2>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400 sm:text-sm">{user?.email ?? "No email provided"}</p>
             </div>
           </div>
 
@@ -88,32 +88,32 @@ export function MorePage() {
             <Button
               type="button"
               variant="outline"
-              className="h-10 rounded-2xl px-4"
+              className="h-9 rounded-xl px-3 sm:h-10 sm:rounded-2xl sm:px-4"
               onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             >
-              <Moon className="mr-2 h-4 w-4" />
+              <Moon className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
               {resolvedTheme === "dark" ? "Light" : "Dark"}
             </Button>
           </div>
         </div>
       </Card>
 
-      <Card className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-4">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Settings</h2>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{settings.length + 2} items</span>
+      <Card className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:rounded-3xl sm:p-4">
+        <div className="mb-2.5 flex items-center justify-between gap-3 px-1 sm:mb-3">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500 sm:text-sm">Settings</h2>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300 sm:px-2.5 sm:py-1">{settings.length + 2} items</span>
         </div>
 
-        <div className="grid min-w-0 gap-3">
+        <div className="grid min-w-0 gap-2.5 sm:gap-3">
           {settings.map(({ label, description, icon: Icon, onClick, isPlain }) => {
             const content = (
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-100">
-                  <Icon className="h-5 w-5" />
+              <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+                <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-100 sm:h-11 sm:w-11 sm:rounded-2xl">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{label}</p>
-                  <p className="truncate text-sm text-slate-500 dark:text-slate-400">{description}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 sm:text-base">{label}</p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400 sm:text-sm">{description}</p>
                 </div>
               </div>
             );
@@ -124,10 +124,10 @@ export function MorePage() {
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                  className="flex h-full w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-3.5"
                 >
                   {content}
-                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                  <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-slate-400 sm:h-4 sm:w-4" />
                 </button>
               );
             }
@@ -137,11 +137,11 @@ export function MorePage() {
                 key={label}
                 type="button"
                 variant="outline"
-                className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                className="flex h-full w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-3.5"
                 onClick={onClick}
               >
                 {content}
-                <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-slate-400 sm:h-4 sm:w-4" />
               </Button>
             );
           })}
@@ -150,18 +150,18 @@ export function MorePage() {
             type="button"
             disabled={resetStockMutation.isPending}
             onClick={() => setShowResetConfirm(true)}
-            className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-left text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:border-amber-800 dark:hover:bg-amber-900"
+            className="flex h-full w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-left text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:border-amber-800 dark:hover:bg-amber-900 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-3.5"
           >
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900 dark:text-amber-300">
-                <RotateCcw className="h-5 w-5" />
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+              <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900 dark:text-amber-300 sm:h-11 sm:w-11 sm:rounded-2xl">
+                <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{resetStockMutation.isPending ? "Resetting Stock..." : "Reset All Stock"}</p>
-                <p className="truncate text-sm text-amber-700 dark:text-amber-400">Set every product's stock quantity to zero.</p>
+                <p className="truncate text-sm font-semibold sm:text-base">{resetStockMutation.isPending ? "Resetting Stock..." : "Reset All Stock"}</p>
+                <p className="truncate text-xs text-amber-700 dark:text-amber-400 sm:text-sm">Set every product's stock quantity to zero.</p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 flex-shrink-0 text-amber-500" />
+            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-amber-500 sm:h-4 sm:w-4" />
           </button>
 
           <button
@@ -170,18 +170,18 @@ export function MorePage() {
               await logout();
               navigate("/login");
             }}
-            className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-left text-red-700 transition hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300 dark:hover:border-red-700 dark:hover:bg-red-900"
+            className="flex h-full w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-left text-red-700 transition hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300 dark:hover:border-red-700 dark:hover:bg-red-900 sm:gap-4 sm:rounded-2xl sm:px-4 sm:py-3.5"
           >
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl bg-red-100 text-red-700 shadow-sm dark:bg-red-900 dark:text-red-300">
-                <LogOut className="h-5 w-5" />
+            <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+              <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl bg-red-100 text-red-700 shadow-sm dark:bg-red-900 dark:text-red-300 sm:h-11 sm:w-11 sm:rounded-2xl">
+                <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">Logout</p>
-                <p className="truncate text-sm text-red-600 dark:text-red-300">Sign out of your Inventra account.</p>
+                <p className="truncate text-sm font-semibold sm:text-base">Logout</p>
+                <p className="truncate text-xs text-red-600 dark:text-red-300 sm:text-sm">Sign out of your Inventra account.</p>
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 flex-shrink-0 text-red-500" />
+            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-red-500 sm:h-4 sm:w-4" />
           </button>
         </div>
       </Card>

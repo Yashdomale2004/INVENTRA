@@ -296,44 +296,44 @@ export function TrackPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div>
-        <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100">Track Parcel</h1>
-        <p className="text-sm text-slate-500">Enter a tracking number to view the complete shipment activity timeline.</p>
+        <h1 className="text-xl font-black text-slate-900 dark:text-slate-100 sm:text-3xl">Track Parcel</h1>
+        <p className="text-xs text-slate-500 sm:text-sm">Enter a tracking number to view the complete shipment activity timeline.</p>
       </div>
 
-      <Card className="rounded-3xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-            <Package className="h-5 w-5" />
+      <Card className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:rounded-3xl sm:p-6">
+        <div className="mb-3 flex items-center gap-2.5 sm:mb-4 sm:gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 sm:h-11 sm:w-11 sm:rounded-2xl">
+            <Package className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Tracking</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Parcel Status Lookup</h2>
+            <h2 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100 sm:text-lg">Parcel Status Lookup</h2>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 sm:left-3 sm:h-4 sm:w-4" />
             <Input
-              className="h-12 rounded-2xl pl-10"
+              className="h-10 rounded-xl pl-9 sm:h-12 sm:rounded-2xl sm:pl-10"
               placeholder="Enter tracking number"
               value={trackingNumber}
               onChange={(event) => setTrackingNumber(event.target.value)}
             />
           </div>
-          <div className="flex gap-3 sm:w-auto">
-            <Button type="button" className="h-12 rounded-2xl px-5" onClick={handleSearch}>
-              <Search className="mr-2 h-4 w-4" /> Track
+          <div className="flex gap-2.5 sm:w-auto sm:gap-3">
+            <Button type="button" className="h-10 rounded-xl px-4 sm:h-12 sm:rounded-2xl sm:px-5" onClick={handleSearch}>
+              <Search className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> Track
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-12 rounded-2xl px-4"
+              className="h-10 rounded-xl px-3 sm:h-12 sm:rounded-2xl sm:px-4"
               onClick={() => window.open(trackingLink, "_blank", "noopener,noreferrer")}
             >
-              <ExternalLink className="mr-2 h-4 w-4" /> Open
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> Open
             </Button>
           </div>
         </div>
@@ -352,35 +352,35 @@ export function TrackPage() {
           <p className="text-sm text-slate-500">Loading dispatched orders…</p>
         ) : dispatchedOrders.length ? (
           dispatchedOrders.map((order) => (
-            <Card key={order.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Card key={order.id} className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:rounded-3xl sm:p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{order.orderId} · {order.customerName}</p>
                   <p className="truncate text-xs text-slate-500">{getOrderProduct(order)}{getOrderQuantity(order) ? ` · ${getOrderQuantity(order)} pcs` : ""}</p>
                 </div>
-                <span className="shrink-0 rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                <span className="shrink-0 rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 sm:px-2.5 sm:py-1 sm:text-xs">
                   Dispatch
                 </span>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-slate-800">
+              <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-2.5 py-2 dark:bg-slate-800 sm:mt-3 sm:rounded-2xl sm:px-3">
                 <div className="min-w-0">
                   <p className="text-[10px] uppercase text-slate-400">Tracking Number</p>
                   <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{order.trackingNumber || "Not assigned yet"}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                   {order.trackingNumber ? (
                     <button
                       type="button"
                       onClick={() => copyTrackingNumber(order.trackingNumber)}
-                      className="rounded-lg border border-slate-200 p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700"
+                      className="rounded-lg border border-slate-200 p-2.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 sm:p-3"
                       aria-label="Copy tracking number"
                       title="Copy tracking number"
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                   ) : null}
-                  <Button type="button" variant="outline" className="h-9 rounded-xl px-3 text-xs" onClick={() => viewDispatchedOrder(order)}>
+                  <Button type="button" variant="outline" className="h-8 rounded-xl px-2.5 text-xs sm:h-9 sm:px-3" onClick={() => viewDispatchedOrder(order)}>
                     View
                   </Button>
                 </div>
@@ -440,13 +440,13 @@ export function TrackPage() {
       ) : null}
 
       {/* ── Shipment Entry ───────────────────────────────────────────── */}
-      <Card className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">New Shipment</p>
-        <div className="space-y-3">
+      <Card className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:rounded-3xl sm:p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400 sm:mb-4">New Shipment</p>
+        <div className="space-y-2.5 sm:space-y-3">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Items</label>
             <Input
-              className="h-11 rounded-2xl"
+              className="h-10 rounded-xl sm:h-11 sm:rounded-2xl"
               placeholder="Describe items being shipped"
               value={shipmentForm.items}
               onChange={(e) => setShipmentForm((f) => ({ ...f, items: e.target.value }))}
@@ -458,7 +458,7 @@ export function TrackPage() {
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Dispatch Date</label>
               <Input
                 type="date"
-                className="h-11 rounded-2xl"
+                className="h-10 rounded-xl sm:h-11 sm:rounded-2xl"
                 value={shipmentForm.dispatchDate}
                 onChange={(e) => setShipmentForm((f) => ({ ...f, dispatchDate: e.target.value }))}
               />
@@ -467,7 +467,7 @@ export function TrackPage() {
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Expected Delivery</label>
               <Input
                 type="date"
-                className="h-11 rounded-2xl"
+                className="h-10 rounded-xl sm:h-11 sm:rounded-2xl"
                 value={shipmentForm.expectedDelivery}
                 onChange={(e) => setShipmentForm((f) => ({ ...f, expectedDelivery: e.target.value }))}
               />
@@ -478,7 +478,7 @@ export function TrackPage() {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Courier Company</label>
             <div className="relative">
               <select
-                className="h-11 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:h-11 sm:rounded-2xl"
                 value={isManualCourier ? MANUAL_COURIER_VALUE : shipmentForm.courierCompany}
                 onChange={(e) => handleCourierSelectChange(e.target.value)}
               >
@@ -487,11 +487,11 @@ export function TrackPage() {
                 ))}
                 <option value={MANUAL_COURIER_VALUE}>Other (Enter manually)</option>
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500 sm:h-4 sm:w-4" />
             </div>
             {isManualCourier ? (
               <Input
-                className="mt-2 h-11 rounded-2xl"
+                className="mt-2 h-10 rounded-xl sm:h-11 sm:rounded-2xl"
                 placeholder="Type courier company name"
                 value={shipmentForm.courierCompany}
                 onChange={(e) => setShipmentForm((f) => ({ ...f, courierCompany: e.target.value }))}
@@ -503,7 +503,7 @@ export function TrackPage() {
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tracking ID</label>
             <Input
-              className="h-11 rounded-2xl"
+              className="h-10 rounded-xl sm:h-11 sm:rounded-2xl"
               placeholder="Courier tracking number"
               value={shipmentForm.trackingId}
               onChange={(e) => setShipmentForm((f) => ({ ...f, trackingId: e.target.value }))}
@@ -512,9 +512,9 @@ export function TrackPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Courier Slip</label>
-            <label className="flex h-24 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
-              <span className="inline-flex items-center gap-2">
-                <Upload className="h-4 w-4" /> Upload JPG / JPEG / PNG
+            <label className="flex h-20 cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 sm:h-24 sm:rounded-2xl sm:text-sm">
+              <span className="inline-flex items-center gap-1.5 sm:gap-2">
+                <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Upload JPG / JPEG / PNG
               </span>
               <input type="file" accept="image/jpg,image/jpeg,image/png" className="hidden" onChange={(e) => onSlipUpload(e.target.files?.[0] ?? null)} />
             </label>
@@ -526,15 +526,15 @@ export function TrackPage() {
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</label>
             <textarea
-              className="h-20 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              className="h-16 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 sm:h-20 sm:rounded-2xl"
               placeholder="Any additional notes"
               value={shipmentForm.notes}
               onChange={(e) => setShipmentForm((f) => ({ ...f, notes: e.target.value }))}
             />
           </div>
 
-          <Button type="button" disabled={isSavingShipment} className="h-11 w-full rounded-2xl bg-blue-600 text-white hover:bg-blue-700" onClick={saveShipment}>
-            <Plus className="mr-1.5 h-4 w-4" /> Save Shipment
+          <Button type="button" disabled={isSavingShipment} className="h-10 w-full rounded-xl bg-blue-600 text-white hover:bg-blue-700 sm:h-11 sm:rounded-2xl" onClick={saveShipment}>
+            <Plus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Save Shipment
           </Button>
         </div>
       </Card>
