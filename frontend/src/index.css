@@ -24,8 +24,15 @@ body,
   min-height: 100%;
 }
 
+html {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
   font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
   background: hsl(var(--surface));
   color: hsl(var(--text));

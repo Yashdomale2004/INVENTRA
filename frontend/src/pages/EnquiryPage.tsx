@@ -1,7 +1,7 @@
 import { ChevronDown, Copy, Minus, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createWorker, type Worker as TesseractWorker } from "tesseract.js";
+import type { Worker as TesseractWorker } from "tesseract.js";
 import { toast } from "sonner";
 
 import { Button } from "../components/ui/button";
@@ -263,6 +263,7 @@ export function EnquiryPage() {
 
   const getOcrWorker = async () => {
     if (!ocrWorkerRef.current) {
+      const { createWorker } = await import("tesseract.js");
       ocrWorkerRef.current = await createWorker("eng");
     }
     return ocrWorkerRef.current;

@@ -1,4 +1,5 @@
 import { getCurrentUser, supabase } from "../lib/supabase";
+import { retryOnNetworkError } from "../lib/retryNetworkError";
 
 type RegisterPayload = {
   username: string;
@@ -17,7 +18,7 @@ type ProfileUpdatePayload = {
 };
 
 export async function login(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await retryOnNetworkError(() => supabase.auth.signInWithPassword({ email, password }));
 
   // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
   console.log("[auth] signInWithPassword result", {
@@ -47,17 +48,19 @@ export async function login(email: string, password: string) {
 }
 
 export async function register(payload: RegisterPayload) {
-  const { data, error } = await supabase.auth.signUp({
-    email: payload.email,
-    password: payload.password,
-    options: {
-      data: {
-        username: payload.username,
-        first_name: payload.first_name,
-        last_name: payload.last_name,
+  const { data, error } = await retryOnNetworkError(() =>
+    supabase.auth.signUp({
+      email: payload.email,
+      password: payload.password,
+      options: {
+        data: {
+          username: payload.username,
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+        },
       },
-    },
-  });
+    })
+  );
 
   if (error) {
     console.error("Supabase signup failed", {
@@ -69,10 +72,12 @@ export async function register(payload: RegisterPayload) {
   }
 
   if (!data.session && data.user) {
-    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-      email: payload.email,
-      password: payload.password,
-    });
+    const { data: loginData, error: loginError } = await retryOnNetworkError(() =>
+      supabase.auth.signInWithPassword({
+        email: payload.email,
+        password: payload.password,
+      })
+    );
 
     if (loginError) {
       console.error("Supabase post-signup login failed", {

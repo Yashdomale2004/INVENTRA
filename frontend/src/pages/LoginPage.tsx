@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -39,6 +40,10 @@ export function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
 
   const getErrorMessage = (error: any, fallback: string) => {
+    if (isAuthRetryableFetchError(error)) {
+      return "Network error — the request couldn't reach the server. Check your connection and try again.";
+    }
+
     if (error?.message === "Invalid login credentials") {
       return "Invalid login credentials. Use the account email and password you registered with.";
     }

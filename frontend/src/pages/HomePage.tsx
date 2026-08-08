@@ -2,8 +2,7 @@ import { Box, CheckCircle2, Download, Eye, FileDown, Lock, Pencil, Printer, Sear
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
-import { createWorker } from "tesseract.js";
+import type { Worker as TesseractWorker } from "tesseract.js";
 
 import { Card } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
@@ -306,7 +305,7 @@ export function HomePage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const [addressPreview, setAddressPreview] = useState<{ orderId: string; text: string; loading: boolean } | null>(null);
-  const addressOcrWorkerRef = useRef<Awaited<ReturnType<typeof createWorker>> | null>(null);
+  const addressOcrWorkerRef = useRef<TesseractWorker | null>(null);
   const addressTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -553,6 +552,7 @@ export function HomePage() {
 
   const getAddressOcrWorker = async () => {
     if (!addressOcrWorkerRef.current) {
+      const { createWorker } = await import("tesseract.js");
       addressOcrWorkerRef.current = await createWorker("eng");
     }
     return addressOcrWorkerRef.current;
@@ -593,10 +593,11 @@ export function HomePage() {
     window.print();
   };
 
-  const downloadAddressPreviewPdf = () => {
+  const downloadAddressPreviewPdf = async () => {
     if (!addressPreview) return;
     const text = addressPreview.text.trim() || "No address text available.";
 
+    const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     const marginX = 22;
     const marginY = 28;
