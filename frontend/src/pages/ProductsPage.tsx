@@ -146,12 +146,12 @@ function ProductForm({ initial, onCancel, onSaved }: { initial?: Product | null;
   return (
     <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit((values) => mutation.mutate(values))}>
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Product Name</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Product Name</label>
         <Input {...register("name")} />
         {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
       </div>
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Category</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Category</label>
         <Select {...register("category")}>
           <option value="">Select category</option>
           {categories?.map((item: Category) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -170,7 +170,7 @@ function ProductForm({ initial, onCancel, onSaved }: { initial?: Product | null;
         )}
       </div>
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Brand</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Brand</label>
         <Select {...register("brand")}>
           <option value="">Select brand</option>
           {brands?.map((item: Brand) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -189,19 +189,19 @@ function ProductForm({ initial, onCancel, onSaved }: { initial?: Product | null;
         )}
       </div>
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Unit</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Unit</label>
         <Select {...register("unit")}> <option value="pcs">Pieces</option> <option value="kg">Kilogram</option> <option value="ltr">Liter</option> <option value="box">Box</option> </Select>
       </div>
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Minimum Stock</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Minimum Stock</label>
         <Input type="number" min="0" {...register("minimum_stock", { valueAsNumber: true })} />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Purchase Price</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Purchase Price</label>
         <Input {...register("purchase_price")} />
       </div>
       <div className="md:col-span-2">
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">T-Shirt Sizes</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">T-Shirt Sizes</label>
         <div className="mt-2 flex flex-wrap gap-2">
           {sizePresets.map((preset) => (
             <button
@@ -223,14 +223,14 @@ function ProductForm({ initial, onCancel, onSaved }: { initial?: Product | null;
             </button>
           ))}
         </div>
-        {!selectedSizes.length && <p className="mt-2 text-xs text-slate-500">Select one or more standard sizes: S, M, L, XL.</p>}
+        {!selectedSizes.length && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Select one or more standard sizes: S, M, L, XL.</p>}
       </div>
       <div className="md:col-span-2">
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Description</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Description</label>
         <TextArea {...register("description")} />
       </div>
       <div className="md:col-span-2">
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Product Image</label>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Product Image</label>
         <Input type="file" accept="image/*" {...register("image")} />
       </div>
       <div className="md:col-span-2 flex items-center justify-between gap-3">
@@ -271,15 +271,17 @@ export function ProductsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3">
         <div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100">Products</h2>
-          <p className="text-sm text-slate-500">Manage product master data and sizes.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Manage product master data and sizes.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/brands")}>Manage Brands</Button>
-          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["products"] })}><RefreshCcw className="mr-2 h-4 w-4" /> Refresh</Button>
+        <div className="grid grid-cols-1 gap-2">
           <Button onClick={() => { setActiveProduct(null); setOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Add New Product</Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => navigate("/brands")}>Manage Brands</Button>
+            <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["products"] })}><RefreshCcw className="mr-2 h-4 w-4" /> Refresh</Button>
+          </div>
         </div>
       </div>
 
@@ -289,41 +291,32 @@ export function ProductsPage() {
 
       <Card>
         {isLoading ? (
-          <p className="text-sm text-slate-500">Loading products...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading products...</p>
         ) : filtered.length ? (
-          <div className="overflow-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="py-2 pr-4">Product</th>
-                  <th className="py-2 pr-4">Category</th>
-                  <th className="py-2 pr-4">Brand</th>
-                  <th className="py-2 pr-4">Stock</th>
-                  <th className="py-2 pr-4">Min Stock</th>
-                  <th className="py-2 pr-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="py-3 pr-4">{item.name}</td>
-                    <td className="py-3 pr-4">{item.category_name}</td>
-                    <td className="py-3 pr-4">{item.brand_name}</td>
-                    <td className="py-3 pr-4">{item.sizes?.reduce((total, size) => total + size.current_stock, 0) ?? 0}</td>
-                    <td className="py-3 pr-4">{item.minimum_stock}</td>
-                    <td className="py-3 pr-4">
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => { setActiveProduct(item); setOpen(true); }}><Edit2 className="mr-2 h-4 w-4" /> Edit</Button>
-                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(item.id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-3">
+            {filtered.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{item.name}</p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">{item.brand_name} &bull; {item.category_name}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    Stock: {item.sizes?.reduce((total, size) => total + size.current_stock, 0) ?? 0}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Minimum Stock: {item.minimum_stock}</p>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <Button variant="outline" size="sm" onClick={() => { setActiveProduct(item); setOpen(true); }}><Edit2 className="mr-2 h-4 w-4" /> Edit</Button>
+                  <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(item.id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
-          <p className="text-sm text-slate-500">No products found.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">No products found.</p>
         )}
       </Card>
 

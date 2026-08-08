@@ -76,7 +76,7 @@ export function DistributorManagementPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-slate-100">Distributor Management</h2>
-        <p className="text-sm text-slate-500">Add, edit, search, and delete distributor records.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Add, edit, search, and delete distributor records.</p>
       </div>
       <Card>
         <Input placeholder="Search distributor" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -103,14 +103,36 @@ export function DistributorManagementPage() {
         </form>
       </Card>
       <Card>
-        <div className="overflow-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2 pr-4">Distributor</th><th className="py-2 pr-4">Company</th><th className="py-2 pr-4">Phone</th><th className="py-2 pr-4">City</th><th className="py-2 pr-4">Actions</th></tr></thead>
-            <tbody>
-              {filtered.map((item) => <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800"><td className="py-3 pr-4">{item.distributor_name}</td><td className="py-3 pr-4">{item.company_name}</td><td className="py-3 pr-4">{item.mobile}</td><td className="py-3 pr-4">{item.city}</td><td className="py-3 pr-4 flex gap-2"><Button variant="outline" size="sm" onClick={() => { setEditing(item); form.reset(item); }}>Edit</Button><Button variant="ghost" size="sm" onClick={() => deleteDistributor(item.id).then(() => queryClient.invalidateQueries({ queryKey: ["distributors"] }))}>Delete</Button></td></tr>)}
-            </tbody>
-          </table>
-        </div>
+        {filtered.length ? (
+          <div className="grid gap-3">
+            {filtered.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{item.distributor_name}</p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{item.company_name}</p>
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
+                  <p className="truncate"><span className="text-slate-400">Phone: </span>{item.mobile || "-"}</p>
+                  <p className="truncate"><span className="text-slate-400">City: </span>{item.city || "-"}</p>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <Button variant="outline" size="sm" onClick={() => { setEditing(item); form.reset(item); }}>Edit</Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deleteDistributor(item.id).then(() => queryClient.invalidateQueries({ queryKey: ["distributors"] }))}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500 dark:text-slate-400">No distributors found.</p>
+        )}
       </Card>
     </div>
   );

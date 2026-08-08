@@ -539,3 +539,8 @@ alter table public.enquiries
 alter table public.enquiries
   add column if not exists notes text not null default '';
 
+-- ===== migrations/20260808_enquiries_extracted_address.sql =====
+-- OCR-extracted, user-editable address text from the shipping screenshot uploaded on the Enquiry form.
+alter table public.enquiries
+  add column if not exists extracted_address text not null default '';
+

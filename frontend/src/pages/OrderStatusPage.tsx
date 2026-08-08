@@ -129,7 +129,7 @@ export function OrderStatusPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+      <div className="grid gap-4">
         <Card className="space-y-3 rounded-3xl border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center justify-between gap-2">
             <div>

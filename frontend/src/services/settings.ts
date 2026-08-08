@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { getCurrentUser, supabase } from "../lib/supabase";
 
 export type AppSetting = {
   id: string;
@@ -12,15 +12,17 @@ export type AppSetting = {
 };
 
 export async function fetchAppSettings() {
-  const { data: session } = await supabase.auth.getUser();
-  if (!session.user) {
+  let user;
+  try {
+    user = await getCurrentUser();
+  } catch {
     return [];
   }
 
   const { data, error } = await supabase
     .from("app_settings")
     .select("*")
-    .eq("user_id", session.user.id)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -31,14 +33,7 @@ export async function fetchAppSettings() {
 }
 
 export async function saveAppSetting(payload: Partial<AppSetting>) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw userError ?? new Error("User not authenticated");
-  }
+  const user = await getCurrentUser();
 
   const { data: existingList, error: fetchError } = await supabase
     .from("app_settings")

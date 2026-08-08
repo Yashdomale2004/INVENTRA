@@ -1,18 +1,21 @@
-import { ChevronDown, Minus, Plus, Trash2, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Copy, Minus, Plus, Trash2, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createWorker, type Worker as TesseractWorker } from "tesseract.js";
 import { toast } from "sonner";
 
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { getErrorMessage } from "../lib/errors";
-import { notifyInventorySync } from "../lib/inventorySync";
+import { INVENTORY_SYNC_EVENT, notifyInventorySync } from "../lib/inventorySync";
 import { createEmptyCombination, type OrderStatus, type RequirementCombination } from "../lib/orderStorage";
 import { createEnquiry, fetchEnquiries, type EnquiryRecord } from "../services/enquiries";
-import { deductStockForEnquiry } from "../services/inventory";
+import { deductStockForEnquiry, fetchInventoryByBrand, type BrandSizeStock } from "../services/inventory";
 
 type BrandName = "Sunkool" | "Ceramic Shield" | "R S" | "Puma" | "Plain T-Shirts";
 type SizeName = "S" | "M" | "L" | "XL";
+type BrandStockMap = Map<string, Map<SizeName, number>>;
 
 type EnquiryForm = {
   customerName: string;
@@ -22,6 +25,7 @@ type EnquiryForm = {
   shippingImage: string;
   orderStatus: OrderStatus;
   notes: string;
+  extractedAddress: string;
 };
 
 const brandOptions: BrandName[] = ["Plain T-Shirts", "Sunkool", "Ceramic Shield", "R S", "Puma"];
@@ -29,6 +33,32 @@ const sizeOptions: SizeName[] = ["S", "M", "L", "XL"];
 const enquiryOrderStatuses: OrderStatus[] = ["New", "Pending"];
 const assignerPresets = ["Raghav Sir", "Devansh Sir"] as const;
 const MANUAL_ASSIGNER_VALUE = "__manual__";
+
+// Brand names in Stock Up/Products don't always match spacing exactly (e.g. "R S" vs "RS"),
+// so stock lookups compare on a normalized key rather than an exact string match.
+function normalizeBrandKey(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "");
+}
+
+function buildStockMap(brands: BrandSizeStock[]): BrandStockMap {
+  const map: BrandStockMap = new Map();
+  for (const brand of brands) {
+    const sizeMap = new Map<SizeName, number>();
+    for (const { size, stock } of brand.sizes) {
+      if ((sizeOptions as string[]).includes(size)) {
+        const sizeKey = size as SizeName;
+        sizeMap.set(sizeKey, (sizeMap.get(sizeKey) ?? 0) + stock);
+      }
+    }
+    map.set(normalizeBrandKey(brand.brandName), sizeMap);
+  }
+  return map;
+}
+
+function getAvailableStock(stockMap: BrandStockMap, brand: string, size: SizeName): number {
+  if (!brand) return 0;
+  return stockMap.get(normalizeBrandKey(brand))?.get(size) ?? 0;
+}
 
 const initialForm: EnquiryForm = {
   customerName: "",
@@ -38,6 +68,7 @@ const initialForm: EnquiryForm = {
   shippingImage: "",
   orderStatus: "New",
   notes: "",
+  extractedAddress: "",
 };
 
 export function EnquiryPage() {
@@ -48,6 +79,33 @@ export function EnquiryPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [isManualAssigner, setIsManualAssigner] = useState(false);
+  const [isExtractingAddress, setIsExtractingAddress] = useState(false);
+
+  const ocrWorkerRef = useRef<TesseractWorker | null>(null);
+
+  useEffect(() => {
+    return () => {
+      ocrWorkerRef.current?.terminate();
+      ocrWorkerRef.current = null;
+    };
+  }, []);
+
+  const queryClient = useQueryClient();
+  const { data: brandStock = [] } = useQuery({
+    queryKey: ["inventory-by-brand"],
+    queryFn: fetchInventoryByBrand,
+  });
+  const stockMap = useMemo(() => buildStockMap(brandStock), [brandStock]);
+
+  useEffect(() => {
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ["inventory-by-brand"] });
+    window.addEventListener(INVENTORY_SYNC_EVENT, refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener(INVENTORY_SYNC_EVENT, refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [queryClient]);
 
   const customerNameHistory = useMemo(() => {
     const seen = new Set<string>();
@@ -138,17 +196,17 @@ export function EnquiryPage() {
   const incrementQuantity = (id: string, size: SizeName) => {
     setForm((current) => ({
       ...current,
-      combinations: current.combinations.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantities: {
-                ...item.quantities,
-                [size]: item.quantities[size] + 1,
-              },
-            }
-          : item
-      ),
+      combinations: current.combinations.map((item) => {
+        if (item.id !== id) return item;
+        const available = getAvailableStock(stockMap, item.brand, size);
+        return {
+          ...item,
+          quantities: {
+            ...item.quantities,
+            [size]: Math.min(item.quantities[size] + 1, available),
+          },
+        };
+      }),
     }));
   };
 
@@ -171,21 +229,21 @@ export function EnquiryPage() {
 
   const setQuantity = (id: string, size: SizeName, rawValue: string) => {
     const digitsOnly = rawValue.replace(/\D/g, "");
-    const nextValue = digitsOnly === "" ? 0 : Math.max(0, parseInt(digitsOnly, 10));
+    const typedValue = digitsOnly === "" ? 0 : Math.max(0, parseInt(digitsOnly, 10));
 
     setForm((current) => ({
       ...current,
-      combinations: current.combinations.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantities: {
-                ...item.quantities,
-                [size]: nextValue,
-              },
-            }
-          : item
-      ),
+      combinations: current.combinations.map((item) => {
+        if (item.id !== id) return item;
+        const available = getAvailableStock(stockMap, item.brand, size);
+        return {
+          ...item,
+          quantities: {
+            ...item.quantities,
+            [size]: Math.min(typedValue, available),
+          },
+        };
+      }),
     }));
   };
 
@@ -203,10 +261,47 @@ export function EnquiryPage() {
     });
   };
 
+  const getOcrWorker = async () => {
+    if (!ocrWorkerRef.current) {
+      ocrWorkerRef.current = await createWorker("eng");
+    }
+    return ocrWorkerRef.current;
+  };
+
+  const extractAddressFromImage = async (dataUrl: string) => {
+    setIsExtractingAddress(true);
+    try {
+      const worker = await getOcrWorker();
+      const { data } = await worker.recognize(dataUrl);
+      updateField("extractedAddress", data.text.trim());
+      if (data.text.trim()) {
+        toast.success("Address text extracted — review and edit if needed.");
+      } else {
+        toast.error("No text found in the image. You can type the address manually.");
+      }
+    } catch (error) {
+      console.error("[EnquiryPage] OCR extraction failed", error);
+      toast.error("Could not extract text from the image. You can type the address manually.");
+    } finally {
+      setIsExtractingAddress(false);
+    }
+  };
+
+  const copyExtractedAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(form.extractedAddress);
+      toast.success("Address copied.");
+    } catch (error) {
+      console.error("[EnquiryPage] copy address failed", error);
+      toast.error("Could not copy address.");
+    }
+  };
+
   const onUploadShippingImage = (file: File | null) => {
     if (!file) {
       setShippingImageFile(null);
       updateField("shippingImage", "");
+      updateField("extractedAddress", "");
       return;
     }
 
@@ -219,7 +314,11 @@ export function EnquiryPage() {
     setShippingImageFile(file);
     const reader = new FileReader();
     reader.onload = () => {
-      updateField("shippingImage", String(reader.result ?? ""));
+      const dataUrl = String(reader.result ?? "");
+      updateField("shippingImage", dataUrl);
+      if (dataUrl) {
+        extractAddressFromImage(dataUrl);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -233,6 +332,7 @@ export function EnquiryPage() {
       shippingImage: "",
       orderStatus: "New",
       notes: "",
+      extractedAddress: "",
     });
     setShippingImageFile(null);
     setErrors({});
@@ -261,6 +361,24 @@ export function EnquiryPage() {
       nextErrors.requirements = "Add a custom requirement or at least one brand-size quantity combination.";
     }
 
+    if (!nextErrors.requirements) {
+      const stockIssues: string[] = [];
+      for (const combo of validCombinations) {
+        for (const size of sizeOptions) {
+          const qty = combo.quantities[size];
+          if (qty <= 0) continue;
+          const available = getAvailableStock(stockMap, combo.brand, size);
+          if (qty > available) {
+            stockIssues.push(`${combo.brand} ${size}: only ${available} in stock`);
+          }
+        }
+      }
+
+      if (stockIssues.length) {
+        nextErrors.requirements = `Quantity exceeds available stock — ${stockIssues.join(", ")}.`;
+      }
+    }
+
     if (nextErrors.customerName || nextErrors.assignerName || nextErrors.requirements) {
       setErrors(nextErrors);
       toast.error("Please complete required fields.");
@@ -280,6 +398,7 @@ export function EnquiryPage() {
           statusHistory: [{ status: form.orderStatus, updated_at: new Date().toISOString() }],
           deliveryDate: form.orderStatus === "Received" ? new Date().toISOString().slice(0, 10) : null,
           notes: form.notes.trim(),
+          extractedAddress: form.extractedAddress.trim(),
         },
         shippingImageFile
       );
@@ -407,7 +526,7 @@ export function EnquiryPage() {
                       {form.combinations.length > 1 ? (
                         <button
                           type="button"
-                          className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:border-rose-200 hover:text-rose-600 dark:border-slate-700"
+                          className="rounded-xl border border-slate-200 p-3 text-slate-500 transition hover:border-rose-200 hover:text-rose-600 dark:border-slate-700"
                           onClick={() => removeCombination(item.id)}
                           aria-label="Remove requirement"
                         >
@@ -421,39 +540,66 @@ export function EnquiryPage() {
                     >
                       {showSizes ? (
                         <div className="space-y-2">
-                          {sizeOptions.map((size) => (
-                            <div key={size} className="flex items-center justify-between rounded-xl bg-blue-50/70 px-3 py-2 dark:bg-blue-950/40">
-                              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{size} PCS</p>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  className="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-700 hover:border-blue-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                                  onClick={() => decrementQuantity(item.id, size)}
-                                  aria-label={`Decrease ${size} quantity`}
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </button>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  value={item.quantities[size]}
-                                  onChange={(event) => setQuantity(item.id, size, event.target.value)}
-                                  onFocus={(event) => event.target.select()}
-                                  aria-label={`${size} quantity`}
-                                  className="h-8 w-14 shrink-0 rounded-lg border border-slate-300 bg-white text-center text-sm font-bold text-slate-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-                                />
-                                <button
-                                  type="button"
-                                  className="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-700 hover:border-blue-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                                  onClick={() => incrementQuantity(item.id, size)}
-                                  aria-label={`Increase ${size} quantity`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </button>
+                          {sizeOptions.map((size) => {
+                            const available = getAvailableStock(stockMap, item.brand, size);
+                            const outOfStock = available <= 0;
+                            const atMax = item.quantities[size] >= available;
+
+                            return (
+                              <div
+                                key={size}
+                                className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${
+                                  outOfStock ? "bg-slate-100 dark:bg-slate-900/60" : "bg-blue-50/70 dark:bg-blue-950/40"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{size} PCS</p>
+                                  {outOfStock ? (
+                                    <p className="text-xs font-semibold text-rose-500">Out of stock</p>
+                                  ) : (
+                                    <p className="text-[11px] text-slate-400">{available} available</p>
+                                  )}
+                                </div>
+
+                                {outOfStock ? (
+                                  <span className="shrink-0 rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+                                    Out of Stock
+                                  </span>
+                                ) : (
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={item.quantities[size] <= 0}
+                                      className="rounded-lg border border-slate-300 bg-white p-3 text-slate-700 hover:border-blue-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                                      onClick={() => decrementQuantity(item.id, size)}
+                                      aria-label={`Decrease ${size} quantity`}
+                                    >
+                                      <Minus className="h-4 w-4" />
+                                    </button>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      value={item.quantities[size]}
+                                      onChange={(event) => setQuantity(item.id, size, event.target.value)}
+                                      onFocus={(event) => event.target.select()}
+                                      aria-label={`${size} quantity`}
+                                      className="h-11 w-16 shrink-0 rounded-lg border border-slate-300 bg-white text-center text-sm font-bold text-slate-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={atMax}
+                                      className="rounded-lg border border-slate-300 bg-white p-3 text-slate-700 hover:border-blue-300 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                                      onClick={() => incrementQuantity(item.id, size)}
+                                      aria-label={`Increase ${size} quantity`}
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : null}
                     </div>
@@ -487,6 +633,34 @@ export function EnquiryPage() {
               </div>
             ) : null}
           </div>
+
+          {form.shippingImage ? (
+            <div>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Extracted Address</label>
+                {isExtractingAddress ? <span className="text-[11px] text-slate-400">Extracting…</span> : null}
+              </div>
+              <div className="relative">
+                <textarea
+                  className="min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 pr-10 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  placeholder={isExtractingAddress ? "Extracting text from image…" : "Extracted address will appear here — edit if needed"}
+                  value={form.extractedAddress}
+                  onChange={(event) => updateField("extractedAddress", event.target.value)}
+                />
+                {form.extractedAddress ? (
+                  <button
+                    type="button"
+                    onClick={copyExtractedAddress}
+                    className="absolute right-2 top-2 rounded-lg border border-slate-200 bg-white p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900"
+                    aria-label="Copy extracted address"
+                    title="Copy address"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Order Status</label>

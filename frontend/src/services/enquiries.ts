@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { getCurrentUserId, supabase } from "../lib/supabase";
 import type { OrderStatus, RequirementCombination, StatusHistoryEntry } from "../lib/orderStorage";
 
 export type EnquiryRecord = {
@@ -14,6 +14,7 @@ export type EnquiryRecord = {
   statusHistory: StatusHistoryEntry[];
   deliveryDate: string | null;
   notes: string;
+  extractedAddress: string;
   createdAt: string;
   hidden: boolean;
 };
@@ -28,28 +29,14 @@ export type EnquiryFormPayload = {
   statusHistory: StatusHistoryEntry[];
   deliveryDate: string | null;
   notes: string;
+  extractedAddress: string;
 };
 
 const SELECT_COLUMNS =
-  "id, order_id, customer_name, assigner_name, custom_requirement, combinations, shipping_image_url, tracking_number, order_status, status_history, delivery_date, notes, created_at, hidden";
+  "id, order_id, customer_name, assigner_name, custom_requirement, combinations, shipping_image_url, tracking_number, order_status, status_history, delivery_date, notes, extracted_address, created_at, hidden";
 
 function logSupabaseError(context: string, error: unknown) {
   console.error(`[enquiries:${context}]`, error);
-}
-
-async function getCurrentUserId() {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    const authError = error ?? new Error("User not authenticated");
-    logSupabaseError("getCurrentUserId", authError);
-    throw authError;
-  }
-
-  return user.id;
 }
 
 function mapRow(row: any): EnquiryRecord {
@@ -66,6 +53,7 @@ function mapRow(row: any): EnquiryRecord {
     statusHistory: row.status_history ?? [],
     deliveryDate: row.delivery_date,
     notes: row.notes ?? "",
+    extractedAddress: row.extracted_address ?? "",
     createdAt: row.created_at,
     hidden: row.hidden ?? false,
   };
@@ -156,6 +144,7 @@ export async function createEnquiry(payload: EnquiryFormPayload, imageFile: File
     status_history: payload.statusHistory,
     delivery_date: payload.deliveryDate,
     notes: payload.notes,
+    extracted_address: payload.extractedAddress,
   };
 
   const { data, error } = await supabase.from("enquiries").insert(insertPayload).select(SELECT_COLUMNS).single();
@@ -200,6 +189,7 @@ export type EnquiryUpdatePayload = {
   statusHistory: StatusHistoryEntry[];
   deliveryDate: string | null;
   notes: string;
+  extractedAddress: string;
 };
 
 export async function updateEnquiry(id: string, patch: EnquiryUpdatePayload): Promise<EnquiryRecord> {
@@ -216,6 +206,7 @@ export async function updateEnquiry(id: string, patch: EnquiryUpdatePayload): Pr
       status_history: patch.statusHistory,
       delivery_date: patch.deliveryDate,
       notes: patch.notes,
+      extracted_address: patch.extractedAddress,
       updated_by: userId,
     })
     .eq("id", id)

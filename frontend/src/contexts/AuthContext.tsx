@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 
 import { fetchProfile, login as loginApi } from "../services/auth";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
@@ -51,45 +52,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        const hasSession = Boolean(data.session);
-        setIsAuthenticated(hasSession);
-        setIsAuthReady(true);
-        if (hasSession) {
-          loadProfile().catch((error) => {
-            console.error("Initial profile bootstrap failed", error);
-            setUser(null);
-          });
-        }
-      })
-      .catch(() => {
-        setIsAuthenticated(false);
-        setUser(null);
-        setIsAuthReady(true);
+    let cancelled = false;
+
+    // Single source of truth for auth state. `onAuthStateChange` fires once
+    // immediately on subscribe with the current session (event: INITIAL_SESSION),
+    // then again on every sign-in/sign-out/token-refresh — so a separate
+    // `getSession()` bootstrap call isn't needed and previously raced against
+    // this listener, which could leave `isAuthenticated` and `user` out of sync.
+    const applySession = async (session: Session | null, source: string) => {
+      // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
+      console.log(`[AuthContext] session from ${source}`, {
+        hasSession: Boolean(session),
+        userId: session?.user?.id ?? null,
+        expiresAt: session?.expires_at ?? null,
       });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(Boolean(session));
-      if (session) {
-        loadProfile().catch((error) => {
-          console.error("Auth state profile refresh failed", error);
+      if (!session) {
+        if (!cancelled) {
           setUser(null);
-        });
-      } else {
-        setUser(null);
+          setIsAuthenticated(false);
+          setIsAuthReady(true);
+        }
+        return;
       }
+
+      try {
+        const profile = await fetchProfile();
+        if (!cancelled) {
+          setUser(profile);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        // A session object existed but we couldn't actually use it (stale/orphaned
+        // session, missing profile row, etc). Do NOT leave isAuthenticated true with
+        // a null user — that half-authenticated state is what let ProtectedRoute
+        // through without a usable session.
+        console.error(`[AuthContext] fetchProfile failed after ${source}`, error);
+        if (!cancelled) {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) setIsAuthReady(true);
+      }
+    };
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
+      console.log("[AuthContext] onAuthStateChange", { event, hasSession: Boolean(session) });
+      applySession(session, `onAuthStateChange:${event}`);
     });
 
     return () => {
+      cancelled = true;
       listener.subscription.unsubscribe();
     };
   }, []);
 
   const login = async (email: string, password: string) => {
-    await loginApi(email, password);
-    await loadProfile();
+    const { session } = await loginApi(email, password);
+    if (!session) {
+      // loginApi already throws when Supabase returns no session, but guard here
+      // too so this function never reports success without one.
+      throw new Error("Login did not return a session.");
+    }
+
+    const profile = await fetchProfile();
+    setUser(profile);
     setIsAuthenticated(true);
   };
 

@@ -373,11 +373,11 @@ export function TrackPage() {
                     <button
                       type="button"
                       onClick={() => copyTrackingNumber(order.trackingNumber)}
-                      className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700"
+                      className="rounded-lg border border-slate-200 p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700"
                       aria-label="Copy tracking number"
                       title="Copy tracking number"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-4 w-4" />
                     </button>
                   ) : null}
                   <Button type="button" variant="outline" className="h-9 rounded-xl px-3 text-xs" onClick={() => viewDispatchedOrder(order)}>
@@ -414,11 +414,11 @@ export function TrackPage() {
                   <button
                     type="button"
                     onClick={() => copyTrackingNumber(activeResult.trackingNumber)}
-                    className="shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-800"
+                    className="shrink-0 rounded-lg border border-slate-200 p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-800"
                     aria-label="Copy tracking number"
                     title="Copy tracking number"
                   >
-                    <Copy className="h-3.5 w-3.5" />
+                    <Copy className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -453,7 +453,7 @@ export function TrackPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Dispatch Date</label>
               <Input
@@ -546,13 +546,15 @@ export function TrackPage() {
           {shipments.map((s) => (
             <Card key={s.id} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-bold text-slate-900 dark:text-slate-100">{s.items}</p>
-                  {s.courierCompany ? <p className="text-xs text-slate-500">{s.courierCompany}{s.trackingId ? ` · ${s.trackingId}` : ""}</p> : null}
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-bold text-slate-900 dark:text-slate-100">{s.items}</p>
+                  {s.courierCompany ? (
+                    <p className="truncate text-xs text-slate-500">{s.courierCompany}{s.trackingId ? ` · ${s.trackingId}` : ""}</p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
-                  className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-slate-700"
+                  className="shrink-0 rounded-xl border border-slate-200 p-3 text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-slate-700"
                   onClick={() => requestDeleteShipment(s.id)}
                   aria-label="Delete shipment"
                 >

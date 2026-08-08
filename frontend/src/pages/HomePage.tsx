@@ -1,7 +1,9 @@
-import { Box, CheckCircle2, Download, Eye, Lock, Minus, Pencil, Plus, Search, Trash2, Truck, X, ZoomIn } from "lucide-react";
+import { Box, CheckCircle2, Download, Eye, FileDown, Lock, Pencil, Printer, Search, Trash2, Truck, X, ZoomIn } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+import { createWorker } from "tesseract.js";
 
 import { Card } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
@@ -9,14 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getErrorMessage } from "../lib/errors";
 import { notifyInventorySync } from "../lib/inventorySync";
 import { notifyOrderDelivered } from "../lib/notificationsStorage";
-import {
-  ORDER_STATUSES,
-  createEmptyCombination,
-  type BrandName,
-  type OrderStatus,
-  type RequirementCombination,
-  type SizeName,
-} from "../lib/orderStorage";
+import { ORDER_STATUSES, type OrderStatus } from "../lib/orderStorage";
 import { fetchEnquiries, hideEnquiry, updateEnquiry, updateEnquiryStatus, type EnquiryRecord } from "../services/enquiries";
 
 type OrderDisplayStatus = "New" | "Printing" | "Dispatch" | "Delivered";
@@ -36,33 +31,30 @@ type OrderHistoryEntry = {
 type EditFormState = {
   customerName: string;
   customRequirement: string;
-  combinations: RequirementCombination[];
   trackingNumber: string;
   orderStatus: OrderStatus;
 };
 
 const WORKFLOW: OrderStatus[] = ["New", "Giving for Printing", "In Printing", "Yet to Pack", "Dispatch", "Received"];
-const brandOptions: BrandName[] = ["Plain T-Shirts", "Sunkool", "Ceramic Shield", "R S", "Puma"];
-const sizeOptions: SizeName[] = ["S", "M", "L", "XL"];
 
 function getStatusBadgeClass(status: string): string {
   switch (status) {
-    case "Giving for Printing": return "bg-blue-100 text-blue-800";
-    case "In Printing": return "bg-orange-100 text-orange-800";
-    case "Yet to Pack": return "bg-yellow-100 text-yellow-800";
-    case "Dispatch": return "bg-teal-100 text-teal-800";
-    case "Received": return "bg-emerald-100 text-emerald-800";
-    default: return "bg-slate-100 text-slate-700";
+    case "Giving for Printing": return "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300";
+    case "In Printing": return "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300";
+    case "Yet to Pack": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300";
+    case "Dispatch": return "bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300";
+    case "Received": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
+    default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
   }
 }
 
 function getDisplayStatusBadgeClass(status: OrderDisplayStatus): string {
   switch (status) {
-    case "New": return "bg-slate-100 text-slate-700";
-    case "Printing": return "bg-orange-100 text-orange-800";
-    case "Dispatch": return "bg-teal-100 text-teal-800";
-    case "Delivered": return "bg-emerald-100 text-emerald-800";
-    default: return "bg-slate-100 text-slate-700";
+    case "New": return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
+    case "Printing": return "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300";
+    case "Dispatch": return "bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300";
+    case "Delivered": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
+    default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
   }
 }
 
@@ -164,6 +156,18 @@ const PDF_STYLES = `
   .combo-row { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 12px; }
   .combo-row .brand-name { font-weight: 700; color: #0f172a; }
   .empty-note { font-size: 12px; color: #64748b; }
+
+  .address-block {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    font-size: 18px;
+    line-height: 1.6;
+    font-weight: 600;
+    color: #0f172a;
+    white-space: pre-wrap;
+  }
 
   @page { margin-top: 130px; margin-bottom: 60px; }
 `;
@@ -301,11 +305,28 @@ export function HomePage() {
   const [detailOrder, setDetailOrder] = useState<EnquiryRecord | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  const [addressPreview, setAddressPreview] = useState<{ orderId: string; text: string; loading: boolean } | null>(null);
+  const addressOcrWorkerRef = useRef<Awaited<ReturnType<typeof createWorker>> | null>(null);
+  const addressTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      addressOcrWorkerRef.current?.terminate();
+      addressOcrWorkerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const el = addressTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [addressPreview?.text, addressPreview?.loading]);
+
   const [editOrder, setEditOrder] = useState<EnquiryRecord | null>(null);
   const [editForm, setEditForm] = useState<EditFormState>({
     customerName: "",
     customRequirement: "",
-    combinations: [],
     trackingNumber: "",
     orderStatus: "New",
   });
@@ -530,6 +551,64 @@ export function HomePage() {
     printWindow.print();
   };
 
+  const getAddressOcrWorker = async () => {
+    if (!addressOcrWorkerRef.current) {
+      addressOcrWorkerRef.current = await createWorker("eng");
+    }
+    return addressOcrWorkerRef.current;
+  };
+
+  const openAddressPreview = async (order: EnquiryRecord) => {
+    const cachedText = order.extractedAddress.trim();
+
+    if (cachedText) {
+      setAddressPreview({ orderId: order.orderId, text: cachedText, loading: false });
+      return;
+    }
+
+    if (!order.shippingImage) {
+      toast.error("No shipping address text or file is available for this order.");
+      return;
+    }
+
+    setAddressPreview({ orderId: order.orderId, text: "", loading: true });
+    try {
+      const worker = await getAddressOcrWorker();
+      const { data } = await worker.recognize(order.shippingImage);
+      const text = data.text.trim();
+      setAddressPreview({ orderId: order.orderId, text, loading: false });
+      if (!text) {
+        toast.error("No address text found in the image. You can type it manually.");
+      }
+    } catch (error) {
+      console.error("[HomePage] address OCR failed", error);
+      setAddressPreview({ orderId: order.orderId, text: "", loading: false });
+      toast.error("Could not extract address text from the image. You can type it manually.");
+    }
+  };
+
+  const closeAddressPreview = () => setAddressPreview(null);
+
+  const printAddressPreview = () => {
+    window.print();
+  };
+
+  const downloadAddressPreviewPdf = () => {
+    if (!addressPreview) return;
+    const text = addressPreview.text.trim() || "No address text available.";
+
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const marginX = 22;
+    const marginY = 28;
+    const maxWidth = doc.internal.pageSize.getWidth() - marginX * 2;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(13);
+    const lines = doc.splitTextToSize(text, maxWidth);
+    doc.text(lines, marginX, marginY, { lineHeightFactor: 1.6 });
+    doc.save(`address-${addressPreview.orderId}.pdf`);
+  };
+
   const handleWorkflowAdvance = async (order: EnquiryRecord, nextStatus: OrderStatus) => {
     setUpdatingOrderId(order.id);
     try {
@@ -561,9 +640,6 @@ export function HomePage() {
     setEditForm({
       customerName: order.customerName,
       customRequirement: order.customRequirement,
-      combinations: order.combinations.length
-        ? order.combinations.map((item) => ({ ...item, quantities: { ...item.quantities } }))
-        : [createEmptyCombination()],
       trackingNumber: order.trackingNumber,
       orderStatus: order.orderStatus,
     });
@@ -577,53 +653,6 @@ export function HomePage() {
     setEditForm((current) => ({ ...current, [key]: value }));
   };
 
-  const updateEditCombination = (id: string, patch: Partial<RequirementCombination>) => {
-    setEditForm((current) => ({
-      ...current,
-      combinations: current.combinations.map((item) => {
-        if (item.id !== id) return item;
-        const nextItem = { ...item, ...patch };
-        if (patch.brand !== undefined) {
-          nextItem.quantities = { S: 0, M: 0, L: 0, XL: 0 };
-        }
-        return nextItem;
-      }),
-    }));
-  };
-
-  const setEditQuantity = (id: string, size: SizeName, rawValue: string) => {
-    const digitsOnly = rawValue.replace(/\D/g, "");
-    const nextValue = digitsOnly === "" ? 0 : Math.max(0, parseInt(digitsOnly, 10));
-    setEditForm((current) => ({
-      ...current,
-      combinations: current.combinations.map((item) =>
-        item.id === id ? { ...item, quantities: { ...item.quantities, [size]: nextValue } } : item
-      ),
-    }));
-  };
-
-  const adjustEditQuantity = (id: string, size: SizeName, delta: number) => {
-    setEditForm((current) => ({
-      ...current,
-      combinations: current.combinations.map((item) =>
-        item.id === id
-          ? { ...item, quantities: { ...item.quantities, [size]: Math.max(0, item.quantities[size] + delta) } }
-          : item
-      ),
-    }));
-  };
-
-  const addEditCombination = () => {
-    setEditForm((current) => ({ ...current, combinations: [...current.combinations, createEmptyCombination()] }));
-  };
-
-  const removeEditCombination = (id: string) => {
-    setEditForm((current) => {
-      const next = current.combinations.filter((item) => item.id !== id);
-      return { ...current, combinations: next.length ? next : [createEmptyCombination()] };
-    });
-  };
-
   const saveEditOrder = async () => {
     if (!editOrder) return;
 
@@ -632,11 +661,8 @@ export function HomePage() {
       return;
     }
 
-    const validCombinations = editForm.combinations.filter(
-      (item) => item.brand && sizeOptions.some((size) => item.quantities[size] > 0)
-    );
-    if (!editForm.customRequirement.trim() && validCombinations.length === 0) {
-      toast.error("Add a custom requirement or at least one brand-size quantity combination.");
+    if (!editForm.customRequirement.trim() && editOrder.combinations.length === 0) {
+      toast.error("This order has no requirements on file — add a custom requirement.");
       return;
     }
 
@@ -652,12 +678,13 @@ export function HomePage() {
       await updateEnquiry(editOrder.id, {
         customerName: editForm.customerName.trim(),
         customRequirement: editForm.customRequirement.trim(),
-        combinations: validCombinations,
+        combinations: editOrder.combinations,
         trackingNumber: editForm.trackingNumber.trim(),
         orderStatus: editForm.orderStatus,
         statusHistory,
         deliveryDate,
         notes: editOrder.notes,
+        extractedAddress: editOrder.extractedAddress,
       });
 
       await refreshHistory();
@@ -710,14 +737,14 @@ export function HomePage() {
       <section className="relative space-y-6">
         <div className="pointer-events-none absolute inset-y-0 left-6 w-px bg-slate-200/70" />
 
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-start gap-4">
             <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Stock Up</h2>
-              <p className="mt-2 text-sm text-slate-500">Add new stock received from distributors.</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Stock Up</h2>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Add new stock received from distributors.</p>
               <div className="mt-4">
-                <Link to="/stock-up" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
+                <Link to="/stock-up" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
                   <Box className="h-4 w-4" /> Open Stock Up
                 </Link>
               </div>
@@ -725,17 +752,17 @@ export function HomePage() {
           </div>
         </Card>
 
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-start gap-4">
             <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Enquiry</h2>
-              <p className="mt-2 text-sm text-slate-500">Capture and manage customer inventory assignments.</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Enquiry</h2>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Capture and manage customer inventory assignments.</p>
               <div className="mt-4">
                 <button
                   type="button"
                   onClick={() => navigate("/enquiry")}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 >
                   <Search className="h-4 w-4" /> Open Enquiry
                 </button>
@@ -744,7 +771,7 @@ export function HomePage() {
           </div>
         </Card>
 
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <button
             type="button"
             onClick={() => setIsSummaryOpen((open) => !open)}
@@ -753,10 +780,10 @@ export function HomePage() {
             <div className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full bg-blue-600" />
             <div className="w-full min-w-0">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-slate-900">Order Summary</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Order Summary</h2>
                 <span className="text-slate-400">{isSummaryOpen ? "▲" : "▼"}</span>
               </div>
-              <p className="mt-1 text-sm text-slate-500">Each order's stage — click to expand and advance.</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Each order's stage — click to expand and advance.</p>
             </div>
           </button>
 
@@ -771,15 +798,15 @@ export function HomePage() {
                     const isExpanded = expandedOrderId === order.id;
 
                     return (
-                      <div key={order.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <div key={order.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800"
                           onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
                         >
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-slate-900">{order.orderId} · {order.customerName}</p>
-                            <p className="truncate text-xs text-slate-500">{entry.product}{entry.quantity ? ` · ${entry.quantity} pcs` : ""}</p>
+                            <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{order.orderId} · {order.customerName}</p>
+                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{entry.product}{entry.quantity ? ` · ${entry.quantity} pcs` : ""}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${getStatusBadgeClass(order.orderStatus)}`}>
@@ -790,7 +817,7 @@ export function HomePage() {
                         </button>
 
                         {isExpanded ? (
-                          <div className="space-y-1.5 border-t border-slate-100 px-4 pb-4 pt-3">
+                          <div className="space-y-1.5 border-t border-slate-100 px-4 pb-4 pt-3 dark:border-slate-800">
                             {WORKFLOW.map((stage, index) => {
                               const isDone = index < workflowIdx;
                               const isCurrent = index === workflowIdx;
@@ -804,20 +831,20 @@ export function HomePage() {
                                     isDone
                                       ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20"
                                       : isCurrent
-                                      ? "border-blue-300 bg-blue-50"
-                                      : "border-slate-100 bg-slate-50 opacity-40"
+                                      ? "border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40"
+                                      : "border-slate-100 bg-slate-50 opacity-40 dark:border-slate-800 dark:bg-slate-900/40"
                                   }`}
                                 >
                                   <div className="flex items-center gap-2.5">
                                     {isDone ? (
                                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                                     ) : isCurrent ? (
-                                      <div className="h-4 w-4 shrink-0 rounded-full border-2 border-blue-500 bg-white" />
+                                      <div className="h-4 w-4 shrink-0 rounded-full border-2 border-blue-500 bg-white dark:bg-slate-900" />
                                     ) : (
                                       <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                     )}
                                     <div>
-                                      <p className={`text-xs font-semibold ${isDone ? "text-emerald-800" : isCurrent ? "text-blue-900" : "text-slate-500"}`}>
+                                      <p className={`text-xs font-semibold ${isDone ? "text-emerald-800 dark:text-emerald-300" : isCurrent ? "text-blue-900 dark:text-blue-300" : "text-slate-500 dark:text-slate-400"}`}>
                                         {stage}
                                       </p>
                                       {histEntry ? (
@@ -827,16 +854,27 @@ export function HomePage() {
                                   </div>
 
                                   {isCurrent && nextStage ? (
-                                    <button
-                                      type="button"
-                                      disabled={updatingOrderId === order.id}
-                                      className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                                      onClick={() => handleWorkflowAdvance(order, nextStage)}
-                                    >
-                                      {updatingOrderId === order.id ? "…" : "Done"}
-                                    </button>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      {stage === "Yet to Pack" ? (
+                                        <button
+                                          type="button"
+                                          className="rounded-lg border border-blue-300 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300"
+                                          onClick={() => openAddressPreview(order)}
+                                        >
+                                          Download Address PDF
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        disabled={updatingOrderId === order.id}
+                                        className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                        onClick={() => handleWorkflowAdvance(order, nextStage)}
+                                      >
+                                        {updatingOrderId === order.id ? "…" : "Done"}
+                                      </button>
+                                    </div>
                                   ) : isCurrent && !nextStage ? (
-                                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
                                       Completed!
                                     </span>
                                   ) : null}
@@ -853,19 +891,19 @@ export function HomePage() {
           ) : null}
         </Card>
 
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-col gap-4">
             <div className="flex items-start gap-4">
               <div className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full bg-blue-600" />
               <button
                 type="button"
                 onClick={() => setIsHistoryOpen((open) => !open)}
-                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
+                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left dark:border-slate-700 dark:bg-slate-900"
               >
-                <h2 className="text-lg font-bold text-slate-900">Order History</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Order History</h2>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">{activeHistory.length}</span>
-                  <span className="text-slate-500">{isHistoryOpen ? "▲" : "▼"}</span>
+                  <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">{activeHistory.length}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{isHistoryOpen ? "▲" : "▼"}</span>
                 </div>
               </button>
             </div>
@@ -880,13 +918,13 @@ export function HomePage() {
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
                         placeholder="Search orders"
-                        className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-blue-400"
+                        className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </div>
                     <select
                       value={searchField}
                       onChange={(event) => setSearchField(event.target.value as SearchField)}
-                      className="h-11 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 sm:w-auto"
+                      className="h-11 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 sm:w-auto dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     >
                       <option value="all">All Fields</option>
                       <option value="orderId">Order ID</option>
@@ -899,16 +937,16 @@ export function HomePage() {
                     <button
                       type="button"
                       onClick={() => setExportMenuOpen((open) => !open)}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                     >
                       <Download className="h-4 w-4" /> Export
                     </button>
                     {exportMenuOpen ? (
-                      <div className="absolute right-0 z-10 mt-2 w-40 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
-                        <button type="button" onClick={() => exportHistory("excel")} className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100">
+                      <div className="absolute right-0 z-10 mt-2 w-40 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                        <button type="button" onClick={() => exportHistory("excel")} className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800">
                           Excel
                         </button>
-                        <button type="button" onClick={() => exportHistory("pdf")} className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100">
+                        <button type="button" onClick={() => exportHistory("pdf")} className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800">
                           PDF
                         </button>
                       </div>
@@ -920,7 +958,7 @@ export function HomePage() {
                   <select
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value as "All" | Exclude<OrderDisplayStatus, "Delivered">)}
-                    className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+                    className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   >
                     <option value="All">All</option>
                     <option value="New">New</option>
@@ -931,7 +969,7 @@ export function HomePage() {
                   <select
                     value={dateFilter}
                     onChange={(event) => setDateFilter(event.target.value as DateFilter)}
-                    className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+                    className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                   >
                     <option value="all">All Dates</option>
                     <option value="today">Today</option>
@@ -942,22 +980,22 @@ export function HomePage() {
 
                 {dateFilter === "custom" ? (
                   <div className="grid gap-3 md:grid-cols-2">
-                    <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                    <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                       Start date
                       <input
                         type="date"
                         value={customRange.start}
                         onChange={(event) => setCustomRange((current) => ({ ...current, start: event.target.value }))}
-                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                    <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                       End date
                       <input
                         type="date"
                         value={customRange.end}
                         onChange={(event) => setCustomRange((current) => ({ ...current, end: event.target.value }))}
-                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+                        className="h-11 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </label>
                   </div>
@@ -975,55 +1013,54 @@ export function HomePage() {
                     </button>
                   </div>
                 ) : isHistoryLoading ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                     Loading order history…
                   </div>
                 ) : (
               <>
-                {/* Mobile card layout */}
-                <div className="grid gap-3 md:hidden">
+                <div className="grid gap-3">
                   {filteredHistory.length ? (
                     filteredHistory.map((entry) => (
                       <div
                         key={`${entry.orderId}-${entry.trackingNumber}`}
-                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-slate-900">{entry.orderId}</p>
-                            <p className="truncate text-xs text-slate-500">{entry.customerName}</p>
+                            <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{entry.orderId}</p>
+                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{entry.customerName}</p>
                           </div>
                           <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getDisplayStatusBadgeClass(entry.status)}`}>
                             {entry.status}
                           </span>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600">
+                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                           <p className="truncate"><span className="text-slate-400">Product: </span>{entry.product}</p>
                           <p><span className="text-slate-400">Qty: </span>{entry.quantity}</p>
                           <p><span className="text-slate-400">Date: </span>{formatShortDate(entry.date)}</p>
                           <p className="truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+                        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                           <button
                             type="button"
                             onClick={() => setDetailOrder(entry.raw)}
-                            className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                            className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
                           >
                             <Eye className="h-3.5 w-3.5" /> View
                           </button>
                           <button
                             type="button"
                             onClick={() => openEditOrder(entry.raw)}
-                            className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                            className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
                           >
                             <Pencil className="h-3.5 w-3.5" /> Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => requestDeleteOrder(entry.raw.id)}
-                            className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50"
+                            className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 dark:border-slate-700 dark:text-rose-400 dark:hover:bg-rose-950/40"
                           >
                             <Trash2 className="h-3.5 w-3.5" /> Delete
                           </button>
@@ -1031,86 +1068,10 @@ export function HomePage() {
                       </div>
                     ))
                   ) : (
-                    <p className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    <p className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                       No saved orders match your current filters.
                     </p>
                   )}
-                </div>
-
-                {/* Desktop table layout */}
-                <div className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 md:block">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-left text-sm text-slate-700">
-                      <thead className="bg-slate-100 text-xs uppercase tracking-[0.2em] text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3">Order ID</th>
-                          <th className="px-4 py-3">Customer Name</th>
-                          <th className="px-4 py-3">Product</th>
-                          <th className="px-4 py-3">Quantity</th>
-                          <th className="px-4 py-3">Order Date</th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3">Tracking Number</th>
-                          <th className="px-4 py-3">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredHistory.length ? (
-                          filteredHistory.map((entry) => (
-                            <tr
-                              key={`${entry.orderId}-${entry.trackingNumber}`}
-                              className="border-t border-slate-200 bg-white transition hover:bg-slate-50"
-                            >
-                              <td className="px-4 py-3 font-semibold text-slate-900">{entry.orderId}</td>
-                              <td className="px-4 py-3">{entry.customerName}</td>
-                              <td className="px-4 py-3">{entry.product}</td>
-                              <td className="px-4 py-3">{entry.quantity}</td>
-                              <td className="px-4 py-3">{formatShortDate(entry.date)}</td>
-                              <td className="px-4 py-3">
-                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getDisplayStatusBadgeClass(entry.status)}`}>
-                                  {entry.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3">{entry.trackingNumber}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setDetailOrder(entry.raw)}
-                                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
-                                    aria-label="View order"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openEditOrder(entry.raw)}
-                                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
-                                    aria-label="Edit order"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => requestDeleteOrder(entry.raw.id)}
-                                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:border-rose-300 hover:text-rose-600"
-                                    aria-label="Delete order"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                              No saved orders match your current filters.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               </>
                 )}
@@ -1119,14 +1080,14 @@ export function HomePage() {
           </div>
         </Card>
 
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-start gap-4">
             <div className="mt-1 h-3.5 w-3.5 rounded-full bg-blue-600" />
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Track</h2>
-              <p className="mt-2 text-sm text-slate-500">Open tracking instantly for parcel updates.</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Track</h2>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Open tracking instantly for parcel updates.</p>
               <div className="mt-4">
-                <Link to="/track" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
+                <Link to="/track" className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
                   <Truck className="h-4 w-4" /> Open Tracking
                 </Link>
               </div>
@@ -1134,22 +1095,22 @@ export function HomePage() {
           </div>
         </Card>
 
-        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="relative border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-col gap-4">
             <div className="flex items-start gap-4">
               <div className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full bg-blue-600" />
               <button
                 type="button"
                 onClick={() => setIsDeliveredOpen((open) => !open)}
-                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left"
+                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left dark:border-slate-700 dark:bg-slate-900"
               >
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Delivered Orders</h2>
-                  <p className="mt-1 text-sm text-slate-500">Orders marked Received move here automatically.</p>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Delivered Orders</h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Orders marked Received move here automatically.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">{deliveredOrders.length}</span>
-                  <span className="text-slate-500">{isDeliveredOpen ? "▲" : "▼"}</span>
+                  <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">{deliveredOrders.length}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{isDeliveredOpen ? "▲" : "▼"}</span>
                 </div>
               </button>
             </div>
@@ -1158,35 +1119,35 @@ export function HomePage() {
               <div className="space-y-3">
                 {deliveredOrders.length ? (
                   deliveredOrders.map((entry) => (
-                    <div key={entry.raw.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div key={entry.raw.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-slate-900">{entry.orderId} · {entry.customerName}</p>
-                          <p className="truncate text-xs text-slate-500">{entry.product}{entry.quantity ? ` · ${entry.quantity} pcs` : ""}</p>
+                          <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{entry.orderId} · {entry.customerName}</p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{entry.product}{entry.quantity ? ` · ${entry.quantity} pcs` : ""}</p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                        <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                           Delivered
                         </span>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600">
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300">
                         <p><span className="text-slate-400">Order Date: </span>{formatShortDate(entry.date)}</p>
                         <p><span className="text-slate-400">Delivered: </span>{entry.raw.deliveryDate ? formatShortDate(entry.raw.deliveryDate) : "-"}</p>
                         <p className="col-span-2 truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                         <button
                           type="button"
                           onClick={() => setDetailOrder(entry.raw)}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
                         >
                           <Eye className="h-3.5 w-3.5" /> View Details
                         </button>
                         <button
                           type="button"
                           onClick={() => downloadOrderPdf(entry.raw)}
-                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                          className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
                         >
                           <Download className="h-3.5 w-3.5" /> Download PDF
                         </button>
@@ -1194,7 +1155,7 @@ export function HomePage() {
                     </div>
                   ))
                 ) : (
-                  <p className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                  <p className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
                     No delivered orders yet.
                   </p>
                 )}
@@ -1212,18 +1173,18 @@ export function HomePage() {
           onClick={closeDetailOrder}
         >
           <Card
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border-slate-200 bg-white p-5 shadow-xl"
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Order Details</p>
-                <h2 className="mt-1 text-lg font-bold text-slate-900">{detailOrder.orderId}</h2>
+                <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{detailOrder.orderId}</h2>
               </div>
               <button
                 type="button"
                 onClick={closeDetailOrder}
-                className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300"
+                className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
                 aria-label="Close order details"
               >
                 <X className="h-4 w-4" />
@@ -1231,42 +1192,42 @@ export function HomePage() {
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div><p className="text-xs uppercase text-slate-500">Customer Name</p><p className="font-semibold text-slate-900">{detailOrder.customerName}</p></div>
-              <div><p className="text-xs uppercase text-slate-500">Assigner</p><p className="font-semibold text-slate-900">{detailOrder.assignerName}</p></div>
-              <div><p className="text-xs uppercase text-slate-500">Order Date</p><p className="font-semibold text-slate-900">{formatShortDate(detailOrder.createdAt)}</p></div>
-              <div><p className="text-xs uppercase text-slate-500">Status</p><p className="font-semibold text-slate-900">{toDisplayStatus(detailOrder.orderStatus)}</p></div>
-              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500">Tracking Number</p><p className="font-semibold text-slate-900">{detailOrder.trackingNumber || "-"}</p></div>
-              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500">Custom Requirement</p><p className="font-semibold text-slate-900">{detailOrder.customRequirement || "-"}</p></div>
-              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500">Note / Remarks</p><p className="font-semibold text-slate-900">{detailOrder.notes || "-"}</p></div>
+              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Customer Name</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.customerName}</p></div>
+              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Assigner</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.assignerName}</p></div>
+              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Order Date</p><p className="font-semibold text-slate-900 dark:text-slate-100">{formatShortDate(detailOrder.createdAt)}</p></div>
+              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Status</p><p className="font-semibold text-slate-900 dark:text-slate-100">{toDisplayStatus(detailOrder.orderStatus)}</p></div>
+              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Tracking Number</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.trackingNumber || "-"}</p></div>
+              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Custom Requirement</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.customRequirement || "-"}</p></div>
+              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Note / Remarks</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.notes || "-"}</p></div>
             </div>
 
-            <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs uppercase text-slate-500">Brand / Size / Quantity</p>
+            <div className="mt-4 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
+              <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Brand / Size / Quantity</p>
               {detailOrder.combinations.length ? (
                 <div className="mt-2 space-y-1.5">
                   {detailOrder.combinations.map((combination) => (
-                    <div key={combination.id} className="rounded-xl bg-white px-3 py-2">
-                      <p className="font-semibold text-slate-900">{combination.brand}</p>
-                      <p className="text-xs text-slate-600">
+                    <div key={combination.id} className="rounded-xl bg-white px-3 py-2 dark:bg-slate-900">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{combination.brand}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
                         S: {combination.quantities.S} | M: {combination.quantities.M} | L: {combination.quantities.L} | XL: {combination.quantities.XL}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 font-semibold text-slate-900">-</p>
+                <p className="mt-2 font-semibold text-slate-900 dark:text-slate-100">-</p>
               )}
-              <p className="mt-2 text-xs font-semibold text-slate-600">Total Quantity: {getOrderQuantity(detailOrder)}</p>
+              <p className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">Total Quantity: {getOrderQuantity(detailOrder)}</p>
             </div>
 
             <div className="mt-4">
-              <p className="text-xs uppercase text-slate-500">Shipping Address Screenshot</p>
+              <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Shipping Address Screenshot</p>
               {detailOrder.shippingImage ? (
                 <div className="mt-2 space-y-2">
                   <button
                     type="button"
                     onClick={() => setPreviewImage(detailOrder.shippingImage)}
-                    className="block w-full overflow-hidden rounded-2xl border border-slate-200"
+                    className="block w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700"
                     aria-label="Open shipping screenshot preview"
                   >
                     <img
@@ -1278,13 +1239,13 @@ export function HomePage() {
                   <button
                     type="button"
                     onClick={() => setPreviewImage(detailOrder.shippingImage)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200"
                   >
                     <ZoomIn className="h-3.5 w-3.5" /> View Image
                   </button>
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-slate-500">No screenshot uploaded.</p>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No screenshot uploaded.</p>
               )}
             </div>
           </Card>
@@ -1299,18 +1260,18 @@ export function HomePage() {
           onClick={closeEditOrder}
         >
           <Card
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border-slate-200 bg-white p-5 shadow-xl"
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Edit Order</p>
-                <h2 className="mt-1 text-lg font-bold text-slate-900">{editOrder.orderId}</h2>
+                <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{editOrder.orderId}</h2>
               </div>
               <button
                 type="button"
                 onClick={closeEditOrder}
-                className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300"
+                className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
                 aria-label="Close edit order"
               >
                 <X className="h-4 w-4" />
@@ -1319,29 +1280,29 @@ export function HomePage() {
 
             <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Customer Name</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer Name</label>
                 <input
                   value={editForm.customerName}
                   onChange={(event) => updateEditField("customerName", event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Custom Requirement</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Custom Requirement</label>
                 <input
                   value={editForm.customRequirement}
                   onChange={(event) => updateEditField("customRequirement", event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Order Status</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Order Status</label>
                 <select
                   value={editForm.orderStatus}
                   onChange={(event) => updateEditField("orderStatus", event.target.value as OrderStatus)}
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 >
                   {ORDER_STATUSES.map((status) => (
                     <option key={status} value={status}>{status}</option>
@@ -1350,99 +1311,19 @@ export function HomePage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tracking Number</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Tracking Number</label>
                 <input
                   value={editForm.trackingNumber}
                   onChange={(event) => updateEditField("trackingNumber", event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300"
+                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 />
-              </div>
-
-              <div className="space-y-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Requirements</label>
-
-                {editForm.combinations.map((item) => {
-                  const showSizes = Boolean(item.brand);
-                  return (
-                    <div key={item.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3">
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={item.brand}
-                          onChange={(event) => updateEditCombination(item.id, { brand: event.target.value as BrandName })}
-                          className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300"
-                        >
-                          <option value="">Select brand</option>
-                          {brandOptions.map((brand) => (
-                            <option key={brand} value={brand}>{brand}</option>
-                          ))}
-                        </select>
-                        {editForm.combinations.length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => removeEditCombination(item.id)}
-                            className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
-                            aria-label="Remove requirement"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        ) : null}
-                      </div>
-
-                      {showSizes ? (
-                        <div className="mt-3 space-y-2">
-                          {sizeOptions.map((size) => (
-                            <div key={size} className="flex items-center justify-between rounded-xl bg-blue-50/70 px-3 py-2">
-                              <p className="text-sm font-semibold text-slate-700">{size} PCS</p>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => adjustEditQuantity(item.id, size, -1)}
-                                  className="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-700 hover:border-blue-300"
-                                  aria-label={`Decrease ${size} quantity`}
-                                >
-                                  <Minus className="h-4 w-4" />
-                                </button>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  value={item.quantities[size]}
-                                  onChange={(event) => setEditQuantity(item.id, size, event.target.value)}
-                                  onFocus={(event) => event.target.select()}
-                                  aria-label={`${size} quantity`}
-                                  className="h-8 w-14 shrink-0 rounded-lg border border-slate-300 bg-white text-center text-sm font-bold text-slate-900 outline-none focus:border-blue-400"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => adjustEditQuantity(item.id, size, 1)}
-                                  className="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-700 hover:border-blue-300"
-                                  aria-label={`Increase ${size} quantity`}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  onClick={addEditCombination}
-                  className="inline-flex items-center gap-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                >
-                  <Plus className="h-4 w-4" /> Add Brand
-                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <button
                   type="button"
                   onClick={closeEditOrder}
-                  className="h-11 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="h-11 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   Cancel
                 </button>
@@ -1457,6 +1338,87 @@ export function HomePage() {
               </div>
             </div>
           </Card>
+        </div>
+      ) : null}
+
+      {addressPreview ? (
+        <div
+          className="address-preview-no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={closeAddressPreview}
+        >
+          <style>{`
+            @media print {
+              body * { visibility: hidden; }
+              #address-preview-page, #address-preview-page * { visibility: visible; }
+              #address-preview-page {
+                position: fixed;
+                inset: 0;
+                margin: 0;
+                box-shadow: none;
+                border: none;
+                border-radius: 0;
+              }
+              .address-preview-no-print { display: none !important; }
+            }
+          `}</style>
+          <div
+            className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-xl dark:bg-slate-900"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="address-preview-no-print flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-700">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Shipping Address</p>
+                <h2 className="mt-0.5 text-sm font-bold text-slate-900 dark:text-slate-100">{addressPreview.orderId}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={printAddressPreview}
+                  disabled={addressPreview.loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+                >
+                  <Printer className="h-3.5 w-3.5" /> Print
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadAddressPreviewPdf}
+                  disabled={addressPreview.loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <FileDown className="h-3.5 w-3.5" /> Download PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={closeAddressPreview}
+                  className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
+                  aria-label="Close address preview"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto bg-slate-100 p-6 dark:bg-slate-950">
+              <div id="address-preview-page" className="mx-auto w-full max-w-[210mm] rounded-xl bg-white p-10 shadow-sm">
+                {addressPreview.loading ? (
+                  <p className="text-sm text-slate-500">Extracting address text from the uploaded image…</p>
+                ) : (
+                  <textarea
+                    ref={addressTextareaRef}
+                    value={addressPreview.text}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setAddressPreview((prev) => (prev ? { ...prev, text: value } : prev));
+                    }}
+                    placeholder="No address text found. Type the address manually."
+                    className="min-h-[120px] w-full resize-none overflow-hidden border-none bg-transparent text-base leading-relaxed text-slate-900 outline-none"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 

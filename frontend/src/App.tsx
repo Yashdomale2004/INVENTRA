@@ -1,7 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { Toaster } from "sonner";
 
 import { ProtectedRoute } from "./app/ProtectedRoute";
-import { hasSupabaseConfig } from "./lib/supabase";
+import { useTheme } from "./contexts/ThemeContext";
 import { AppLayout } from "./layouts/AppLayout";
 import { EnquiryPage } from "./pages/EnquiryPage";
 import { HomePage } from "./pages/HomePage";
@@ -23,43 +24,48 @@ import { TermsPage } from "./pages/TermsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 
 function App() {
+  const { resolvedTheme } = useTheme();
+
   return (
-    <Routes>
-      <Route path="/login" element={hasSupabaseConfig ? <LoginPage /> : <Navigate to="/home" replace />} />
+    <>
+      <Toaster richColors theme={resolvedTheme} />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/home" replace />} />
-        <Route path="home" element={<HomePage />} />
-        <Route path="inventory" element={<InventoryPage />} />
-        <Route path="enquiry" element={<EnquiryPage />} />
-        <Route path="stock-up" element={<StockUpPage />} />
-        <Route path="track" element={<TrackPage />} />
-        <Route path="order-status" element={<OrderStatusPage />} />
-        <Route path="more" element={<MorePage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="stock-in" element={<Navigate to="/stock-up" replace />} />
-        <Route path="parcels" element={<Navigate to="/track" replace />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/home" replace />} />
+          <Route path="home" element={<HomePage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="enquiry" element={<EnquiryPage />} />
+          <Route path="stock-up" element={<StockUpPage />} />
+          <Route path="track" element={<TrackPage />} />
+          <Route path="order-status" element={<OrderStatusPage />} />
+          <Route path="more" element={<MorePage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="stock-in" element={<Navigate to="/stock-up" replace />} />
+          <Route path="parcels" element={<Navigate to="/track" replace />} />
 
-        <Route path="products" element={<ProductsPage />} />
-        <Route path="distributors" element={<DistributorManagementPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="profile" element={<ProfilePage />} />
-        <Route path="about" element={<AboutPage />} />
-        <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
-        <Route path="terms" element={<TermsPage />} />
-        <Route path="support" element={<SupportPage />} />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="distributors" element={<DistributorManagementPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="support" element={<SupportPage />} />
 
-        <Route path="*" element={<Navigate to="/home" replace />} />
-      </Route>
-    </Routes>
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Route>
+      </Routes>
+    </>
   );
 }
 

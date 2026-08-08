@@ -170,14 +170,14 @@ export function StockUpPage() {
   });
 
   const renderSizeInputs = (category: CategoryKey, quantities: SizeQuantities) => (
-    <div className="mt-3 grid grid-cols-2 gap-2">
+    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
       {sizeOrder.map((size) => (
         <div key={size} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/70">
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{size}</label>
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900">
             <button
               type="button"
-              className="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:border-blue-300 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white p-3 text-slate-700 transition hover:border-blue-300 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
               onClick={() => decreaseQuantity(category, size, quantities[size])}
               aria-label={`Decrease ${size} quantity`}
             >
@@ -194,11 +194,11 @@ export function StockUpPage() {
               }}
               onFocus={(event) => event.target.select()}
               aria-label={`${size} quantity`}
-              className="h-8 w-14 shrink-0 rounded-lg border border-slate-300 bg-white text-center text-sm font-bold text-slate-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+              className="h-11 w-16 shrink-0 rounded-lg border border-slate-300 bg-white text-center text-sm font-bold text-slate-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
             />
             <button
               type="button"
-              className="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-700 transition hover:border-blue-300 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+              className="rounded-lg border border-slate-300 bg-white p-3 text-slate-700 transition hover:border-blue-300 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
               onClick={() => increaseQuantity(category, size, quantities[size])}
               aria-label={`Increase ${size} quantity`}
             >

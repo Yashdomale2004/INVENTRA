@@ -1,18 +1,5 @@
-import { supabase } from "../lib/supabase";
+import { getCurrentUserId, supabase } from "../lib/supabase";
 import type { Brand, Category, Distributor, Parcel, Product, ProductSize, StockTransaction, Supplier } from "../types";
-
-async function getCurrentUserId() {
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    throw error ?? new Error("User not authenticated");
-  }
-
-  return user.id;
-}
 
 export async function fetchProducts() {
   const { data, error } = await supabase

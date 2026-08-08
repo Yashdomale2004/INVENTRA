@@ -28,6 +28,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.toggle("dark", theme === "dark");
     root.style.colorScheme = theme;
     localStorage.setItem(THEME_STORAGE_KEY, theme);
+
+    const themeColor = theme === "dark" ? "#020617" : "#ffffff";
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "theme-color");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", themeColor);
   }, [theme]);
 
   const value = useMemo(

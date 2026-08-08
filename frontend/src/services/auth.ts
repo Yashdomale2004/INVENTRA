@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase";
+import { getCurrentUser, supabase } from "../lib/supabase";
 
 type RegisterPayload = {
   username: string;
@@ -18,6 +18,16 @@ type ProfileUpdatePayload = {
 
 export async function login(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
+  console.log("[auth] signInWithPassword result", {
+    hasSession: Boolean(data.session),
+    hasUser: Boolean(data.user),
+    userId: data.user?.id ?? null,
+    expiresAt: data.session?.expires_at ?? null,
+    error: error?.message ?? null,
+  });
+
   if (error) {
     console.error("Supabase login failed", {
       message: error.message,
@@ -25,6 +35,12 @@ export async function login(email: string, password: string) {
       code: error.code,
     });
     throw error;
+  }
+
+  if (!data.session) {
+    throw new Error(
+      "Sign-in succeeded but Supabase returned no session. This usually means email confirmation is required — check Supabase Auth settings."
+    );
   }
 
   return data;
@@ -74,19 +90,7 @@ export async function register(payload: RegisterPayload) {
 }
 
 export async function fetchProfile() {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    console.error("Supabase getUser failed", {
-      message: userError?.message,
-      status: userError?.status,
-      code: userError?.code,
-    });
-    throw userError ?? new Error("User session not found");
-  }
+  const user = await getCurrentUser();
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -117,14 +121,7 @@ export async function fetchProfile() {
 }
 
 export async function updateProfile(payload: ProfileUpdatePayload) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw userError ?? new Error("User not authenticated");
-  }
+  const user = await getCurrentUser();
 
   const { data, error } = await supabase
     .from("profiles")
@@ -161,14 +158,7 @@ export async function updateProfile(payload: ProfileUpdatePayload) {
 }
 
 export async function uploadProfilePhoto(file: File) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw userError ?? new Error("User not authenticated");
-  }
+  const user = await getCurrentUser();
 
   const filePath = `${user.id}/${crypto.randomUUID()}-${file.name}`;
   const { error: uploadError } = await supabase.storage.from("profile-photos").upload(filePath, file, {
@@ -214,28 +204,14 @@ export async function changeEmail(email: string) {
 }
 
 export async function updateMobileNumber(mobile: string) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw userError ?? new Error("User not authenticated");
-  }
+  const user = await getCurrentUser();
 
   const { error } = await supabase.from("profiles").update({ mobile }).eq("id", user.id);
   if (error) throw error;
 }
 
 export async function deleteAccountData() {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    throw userError ?? new Error("User not authenticated");
-  }
+  const user = await getCurrentUser();
 
   const [{ error: settingsError }, { error: profileError }] = await Promise.all([
     supabase.from("app_settings").delete().eq("user_id", user.id),

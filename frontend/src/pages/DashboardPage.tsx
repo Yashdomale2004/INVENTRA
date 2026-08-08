@@ -32,16 +32,16 @@ export function DashboardPage() {
         <p className="mt-1 text-sm text-slate-500">Live stock synced from Supabase inventory.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Total Stock</p>
-          <p className="mt-4 text-4xl font-semibold text-slate-900 dark:text-slate-100">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <Card className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-400 sm:tracking-[0.24em]">Total Stock</p>
+          <p className="mt-2 truncate text-3xl font-semibold text-slate-900 dark:text-slate-100 sm:mt-4 sm:text-4xl">
             {isLoading ? "—" : totalStock}
           </p>
         </Card>
-        <Card className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Brands</p>
-          <p className="mt-4 text-4xl font-semibold text-slate-900 dark:text-slate-100">
+        <Card className="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-6">
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-400 sm:tracking-[0.24em]">Brands</p>
+          <p className="mt-2 truncate text-3xl font-semibold text-slate-900 dark:text-slate-100 sm:mt-4 sm:text-4xl">
             {isLoading ? "—" : brands.length}
           </p>
         </Card>
@@ -54,16 +54,16 @@ export function DashboardPage() {
           <EmptyState title="No stock available" description="Add stock via Stock Up to see it here." />
         ) : (
           brands.map((brand) => (
-            <Card key={brand.brandName} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <Card key={brand.brandName} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-base font-bold text-slate-900 dark:text-slate-100">{brand.brandName}</p>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{brand.total} pcs total</span>
+                <p className="min-w-0 truncate text-base font-bold text-slate-900 dark:text-slate-100">{brand.brandName}</p>
+                <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">{brand.total} pcs total</span>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {brand.sizes.map(({ size, stock }) => (
-                  <div key={size} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/70">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{size}</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stock}</p>
+                  <div key={size} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{size}</p>
+                    <p className="mt-1 truncate text-2xl font-bold text-slate-900 dark:text-slate-100">{stock}</p>
                   </div>
                 ))}
               </div>

@@ -47,6 +47,10 @@ export function LoginPage() {
       return "This project still requires email confirmation in Supabase Auth settings. Disable Confirm email to allow instant login after signup.";
     }
 
+    if (error?.message === "Auth session missing!") {
+      return "Signed in, but the session couldn't be saved. This usually means VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is misconfigured for this deployment (wrong project, stray quotes/whitespace, or the build predates a recent env var change). Verify both in your hosting provider's environment variables and redeploy.";
+    }
+
     if (error?.message) {
       return String(error.message);
     }
@@ -123,34 +127,9 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_12%_18%,#86efac_0%,#99f6e4_28%,#f0fdfa_56%,#ffffff_82%)] p-4 dark:bg-[radial-gradient(circle_at_10%_20%,#0f172a_0%,#083344_42%,#020617_92%)]">
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-5xl">
-        <Card className="grid overflow-hidden p-0 md:grid-cols-[1.15fr_0.85fr]">
-          <div className="relative hidden min-h-[640px] flex-col justify-between bg-[linear-gradient(165deg,#0f172a_0%,#134e4a_48%,#99f6e4_100%)] p-10 md:flex">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.26),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.16),transparent_28%)]" />
-            <div className="relative">
-              <p className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/90">
-                Inventory OS
-              </p>
-              <h1 className="mt-6 max-w-md text-5xl font-black tracking-tight text-white">Run your shop from one clear control room.</h1>
-              <p className="mt-5 max-w-md text-sm leading-7 text-white/80">
-                Track products, stock receipts, allocations, shipments, and barcode activity with a secure owner account.
-              </p>
-            </div>
-            <div className="relative grid gap-3 sm:grid-cols-2">
-              {[
-                "Barcode and QR-based lookup",
-                "Stock movements recorded automatically",
-                "Parcel tracking from dispatch to delivery",
-                "Supabase auth session with secure persistence",
-              ].map((item) => (
-                <div key={item} className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm text-white/85 backdrop-blur-md">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="p-6 sm:p-8 md:p-10">
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+        <Card className="overflow-hidden p-0">
+          <div className="p-6 sm:p-8">
             <div className="mx-auto max-w-md">
               <div className="mb-6 flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800/80">
                 {[
