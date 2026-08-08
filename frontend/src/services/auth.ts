@@ -20,15 +20,6 @@ type ProfileUpdatePayload = {
 export async function login(email: string, password: string) {
   const { data, error } = await retryOnNetworkError(() => supabase.auth.signInWithPassword({ email, password }));
 
-  // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
-  console.log("[auth] signInWithPassword result", {
-    hasSession: Boolean(data.session),
-    hasUser: Boolean(data.user),
-    userId: data.user?.id ?? null,
-    expiresAt: data.session?.expires_at ?? null,
-    error: error?.message ?? null,
-  });
-
   if (error) {
     console.error("Supabase login failed", {
       message: error.message,

@@ -113,8 +113,8 @@ export function DistributorManagementPage() {
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
-                  <p className="truncate"><span className="text-slate-400">Phone: </span>{item.mobile || "-"}</p>
-                  <p className="truncate"><span className="text-slate-400">City: </span>{item.city || "-"}</p>
+                  <p className="min-w-0 truncate"><span className="text-slate-400">Phone: </span>{item.mobile || "-"}</p>
+                  <p className="min-w-0 truncate"><span className="text-slate-400">City: </span>{item.city || "-"}</p>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">

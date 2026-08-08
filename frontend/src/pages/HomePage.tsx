@@ -36,6 +36,16 @@ type EditFormState = {
 
 const WORKFLOW: OrderStatus[] = ["New", "Giving for Printing", "In Printing", "Yet to Pack", "Dispatch", "Received"];
 
+const SHIP_FROM_LINES = [
+  "MOHIB",
+  "510, WESTERN PALACE,",
+  "CONGRESS NAGAR,",
+  "OPP. PARK",
+  "NAGPUR - 440012",
+  "MOB. NO. 9156321123",
+];
+const SHIP_FROM_TEXT = SHIP_FROM_LINES.join("\n");
+
 function getStatusBadgeClass(status: string): string {
   switch (status) {
     case "Giving for Printing": return "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300";
@@ -595,18 +605,34 @@ export function HomePage() {
 
   const downloadAddressPreviewPdf = async () => {
     if (!addressPreview) return;
-    const text = addressPreview.text.trim() || "No address text available.";
+    const toText = addressPreview.text.trim() || "No address text available.";
 
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     const marginX = 22;
-    const marginY = 28;
     const maxWidth = doc.internal.pageSize.getWidth() - marginX * 2;
+    const lineHeightFactor = 1.6;
+    const lineHeightMm = doc.getFontSize() * lineHeightFactor * 0.3528;
+
+    let cursorY = 28;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("TO:", marginX, cursorY);
+    cursorY += lineHeightMm + 2;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(13);
-    const lines = doc.splitTextToSize(text, maxWidth);
-    doc.text(lines, marginX, marginY, { lineHeightFactor: 1.6 });
+    const toLines = doc.splitTextToSize(toText, maxWidth);
+    doc.text(toLines, marginX, cursorY, { lineHeightFactor });
+    cursorY += toLines.length * lineHeightMm + 14;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("FROM:", marginX, cursorY);
+    cursorY += lineHeightMm + 2;
+
+    doc.setFont("helvetica", "normal");
+    doc.text(SHIP_FROM_LINES, marginX, cursorY, { lineHeightFactor });
+
     doc.save(`address-${addressPreview.orderId}.pdf`);
   };
 
@@ -828,7 +854,7 @@ export function HomePage() {
                               return (
                                 <div
                                   key={stage}
-                                  className={`flex items-center justify-between rounded-xl border px-3 py-2 transition-all ${
+                                  className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-all ${
                                     isDone
                                       ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/20"
                                       : isCurrent
@@ -836,7 +862,7 @@ export function HomePage() {
                                       : "border-slate-100 bg-slate-50 opacity-40 dark:border-slate-800 dark:bg-slate-900/40"
                                   }`}
                                 >
-                                  <div className="flex items-center gap-2.5">
+                                  <div className="flex min-w-0 items-center gap-2.5">
                                     {isDone ? (
                                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
                                     ) : isCurrent ? (
@@ -844,18 +870,18 @@ export function HomePage() {
                                     ) : (
                                       <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                     )}
-                                    <div>
-                                      <p className={`text-xs font-semibold ${isDone ? "text-emerald-800 dark:text-emerald-300" : isCurrent ? "text-blue-900 dark:text-blue-300" : "text-slate-500 dark:text-slate-400"}`}>
+                                    <div className="min-w-0">
+                                      <p className={`truncate text-xs font-semibold ${isDone ? "text-emerald-800 dark:text-emerald-300" : isCurrent ? "text-blue-900 dark:text-blue-300" : "text-slate-500 dark:text-slate-400"}`}>
                                         {stage}
                                       </p>
                                       {histEntry ? (
-                                        <p className="text-[10px] text-slate-400">{new Date(histEntry.updated_at).toLocaleString()}</p>
+                                        <p className="truncate text-[10px] text-slate-400">{new Date(histEntry.updated_at).toLocaleString()}</p>
                                       ) : null}
                                     </div>
                                   </div>
 
                                   {isCurrent && nextStage ? (
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                                       {stage === "Yet to Pack" ? (
                                         <button
                                           type="button"
@@ -899,7 +925,7 @@ export function HomePage() {
               <button
                 type="button"
                 onClick={() => setIsHistoryOpen((open) => !open)}
-                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left dark:border-slate-700 dark:bg-slate-900"
+                className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left dark:border-slate-700 dark:bg-slate-900"
               >
                 <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Order History</h2>
                 <div className="flex items-center gap-2">
@@ -1037,10 +1063,10 @@ export function HomePage() {
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                          <p className="truncate"><span className="text-slate-400">Product: </span>{entry.product}</p>
-                          <p><span className="text-slate-400">Qty: </span>{entry.quantity}</p>
-                          <p><span className="text-slate-400">Date: </span>{formatShortDate(entry.date)}</p>
-                          <p className="truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
+                          <p className="min-w-0 truncate"><span className="text-slate-400">Product: </span>{entry.product}</p>
+                          <p className="min-w-0 truncate"><span className="text-slate-400">Qty: </span>{entry.quantity}</p>
+                          <p className="min-w-0 truncate"><span className="text-slate-400">Date: </span>{formatShortDate(entry.date)}</p>
+                          <p className="min-w-0 truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
                         </div>
 
                         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -1103,7 +1129,7 @@ export function HomePage() {
               <button
                 type="button"
                 onClick={() => setIsDeliveredOpen((open) => !open)}
-                className="flex flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left dark:border-slate-700 dark:bg-slate-900"
+                className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left dark:border-slate-700 dark:bg-slate-900"
               >
                 <div>
                   <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Delivered Orders</h2>
@@ -1132,9 +1158,9 @@ export function HomePage() {
                       </div>
 
                       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                        <p><span className="text-slate-400">Order Date: </span>{formatShortDate(entry.date)}</p>
-                        <p><span className="text-slate-400">Delivered: </span>{entry.raw.deliveryDate ? formatShortDate(entry.raw.deliveryDate) : "-"}</p>
-                        <p className="col-span-2 truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
+                        <p className="min-w-0 truncate"><span className="text-slate-400">Order Date: </span>{formatShortDate(entry.date)}</p>
+                        <p className="min-w-0 truncate"><span className="text-slate-400">Delivered: </span>{entry.raw.deliveryDate ? formatShortDate(entry.raw.deliveryDate) : "-"}</p>
+                        <p className="col-span-2 min-w-0 truncate"><span className="text-slate-400">Tracking: </span>{entry.trackingNumber}</p>
                       </div>
 
                       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -1178,28 +1204,28 @@ export function HomePage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Order Details</p>
-                <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{detailOrder.orderId}</h2>
+                <h2 className="mt-1 truncate text-lg font-bold text-slate-900 dark:text-slate-100">{detailOrder.orderId}</h2>
               </div>
               <button
                 type="button"
                 onClick={closeDetailOrder}
-                className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
+                className="shrink-0 rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
                 aria-label="Close order details"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Customer Name</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.customerName}</p></div>
-              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Assigner</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.assignerName}</p></div>
-              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Order Date</p><p className="font-semibold text-slate-900 dark:text-slate-100">{formatShortDate(detailOrder.createdAt)}</p></div>
-              <div><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Status</p><p className="font-semibold text-slate-900 dark:text-slate-100">{toDisplayStatus(detailOrder.orderStatus)}</p></div>
-              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Tracking Number</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.trackingNumber || "-"}</p></div>
-              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Custom Requirement</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.customRequirement || "-"}</p></div>
-              <div className="md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Note / Remarks</p><p className="font-semibold text-slate-900 dark:text-slate-100">{detailOrder.notes || "-"}</p></div>
+            <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+              <div className="min-w-0"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Customer Name</p><p className="break-words font-semibold text-slate-900 dark:text-slate-100">{detailOrder.customerName}</p></div>
+              <div className="min-w-0"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Assigner</p><p className="break-words font-semibold text-slate-900 dark:text-slate-100">{detailOrder.assignerName}</p></div>
+              <div className="min-w-0"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Order Date</p><p className="font-semibold text-slate-900 dark:text-slate-100">{formatShortDate(detailOrder.createdAt)}</p></div>
+              <div className="min-w-0"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Status</p><p className="font-semibold text-slate-900 dark:text-slate-100">{toDisplayStatus(detailOrder.orderStatus)}</p></div>
+              <div className="min-w-0 md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Tracking Number</p><p className="break-words font-semibold text-slate-900 dark:text-slate-100">{detailOrder.trackingNumber || "-"}</p></div>
+              <div className="min-w-0 md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Custom Requirement</p><p className="break-words font-semibold text-slate-900 dark:text-slate-100">{detailOrder.customRequirement || "-"}</p></div>
+              <div className="min-w-0 md:col-span-2"><p className="text-xs uppercase text-slate-500 dark:text-slate-400">Note / Remarks</p><p className="break-words font-semibold text-slate-900 dark:text-slate-100">{detailOrder.notes || "-"}</p></div>
             </div>
 
             <div className="mt-4 rounded-2xl bg-slate-50 p-3 dark:bg-slate-950/50">
@@ -1265,14 +1291,14 @@ export function HomePage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Edit Order</p>
-                <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{editOrder.orderId}</h2>
+                <h2 className="mt-1 truncate text-lg font-bold text-slate-900 dark:text-slate-100">{editOrder.orderId}</h2>
               </div>
               <button
                 type="button"
                 onClick={closeEditOrder}
-                className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
+                className="shrink-0 rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
                 aria-label="Close edit order"
               >
                 <X className="h-4 w-4" />
@@ -1368,12 +1394,12 @@ export function HomePage() {
             className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-xl dark:bg-slate-900"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="address-preview-no-print flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-700">
-              <div>
+            <div className="address-preview-no-print flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-700">
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">Shipping Address</p>
-                <h2 className="mt-0.5 text-sm font-bold text-slate-900 dark:text-slate-100">{addressPreview.orderId}</h2>
+                <h2 className="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-slate-100">{addressPreview.orderId}</h2>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <button
                   type="button"
                   onClick={printAddressPreview}
@@ -1406,16 +1432,22 @@ export function HomePage() {
                 {addressPreview.loading ? (
                   <p className="text-sm text-slate-500">Extracting address text from the uploaded image…</p>
                 ) : (
-                  <textarea
-                    ref={addressTextareaRef}
-                    value={addressPreview.text}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setAddressPreview((prev) => (prev ? { ...prev, text: value } : prev));
-                    }}
-                    placeholder="No address text found. Type the address manually."
-                    className="min-h-[120px] w-full resize-none overflow-hidden border-none bg-transparent text-base leading-relaxed text-slate-900 outline-none"
-                  />
+                  <>
+                    <p className="text-sm font-bold tracking-wide text-slate-900">TO:</p>
+                    <textarea
+                      ref={addressTextareaRef}
+                      value={addressPreview.text}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setAddressPreview((prev) => (prev ? { ...prev, text: value } : prev));
+                      }}
+                      placeholder="No address text found. Type the address manually."
+                      className="mt-1 min-h-[100px] w-full resize-none overflow-hidden border-none bg-transparent text-base leading-relaxed text-slate-900 outline-none"
+                    />
+
+                    <p className="mt-8 text-sm font-bold tracking-wide text-slate-900">FROM:</p>
+                    <p className="mt-1 whitespace-pre-line text-base leading-relaxed text-slate-900">{SHIP_FROM_TEXT}</p>
+                  </>
                 )}
               </div>
             </div>

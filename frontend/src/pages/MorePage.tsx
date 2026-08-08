@@ -104,7 +104,7 @@ export function MorePage() {
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{settings.length + 2} items</span>
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3">
           {settings.map(({ label, description, icon: Icon, onClick, isPlain }) => {
             const content = (
               <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -124,7 +124,7 @@ export function MorePage() {
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="flex h-full w-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                  className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:hover:bg-slate-950"
                 >
                   {content}
                   <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
@@ -150,7 +150,7 @@ export function MorePage() {
             type="button"
             disabled={resetStockMutation.isPending}
             onClick={() => setShowResetConfirm(true)}
-            className="flex h-full w-full items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-left text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:border-amber-800 dark:hover:bg-amber-900"
+            className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-left text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300 dark:hover:border-amber-800 dark:hover:bg-amber-900"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900 dark:text-amber-300">
@@ -170,7 +170,7 @@ export function MorePage() {
               await logout();
               navigate("/login");
             }}
-            className="flex h-full w-full items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-left text-red-700 transition hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300 dark:hover:border-red-700 dark:hover:bg-red-900"
+            className="flex h-full w-full min-w-0 items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-left text-red-700 transition hover:border-red-300 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300 dark:hover:border-red-700 dark:hover:bg-red-900"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl bg-red-100 text-red-700 shadow-sm dark:bg-red-900 dark:text-red-300">

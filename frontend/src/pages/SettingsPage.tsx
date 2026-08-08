@@ -86,11 +86,11 @@ function ToggleRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/60">
-      <div>
+      <div className="min-w-0">
         <p className="font-medium text-slate-900 dark:text-slate-100">{label}</p>
         <p className="text-xs text-slate-500">{description}</p>
       </div>
-      <Button type="button" variant={checked ? "default" : "outline"} size="sm" onClick={onToggle}>
+      <Button type="button" variant={checked ? "default" : "outline"} size="sm" className="shrink-0" onClick={onToggle}>
         {checked ? "On" : "Off"}
       </Button>
     </div>

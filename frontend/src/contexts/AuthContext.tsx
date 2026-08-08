@@ -60,13 +60,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // `getSession()` bootstrap call isn't needed and previously raced against
     // this listener, which could leave `isAuthenticated` and `user` out of sync.
     const applySession = async (session: Session | null, source: string) => {
-      // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
-      console.log(`[AuthContext] session from ${source}`, {
-        hasSession: Boolean(session),
-        userId: session?.user?.id ?? null,
-        expiresAt: session?.expires_at ?? null,
-      });
-
       if (!session) {
         if (!cancelled) {
           setUser(null);
@@ -98,8 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      // TEMP DEBUG — remove once the "Auth session missing" investigation is closed.
-      console.log("[AuthContext] onAuthStateChange", { event, hasSession: Boolean(session) });
       applySession(session, `onAuthStateChange:${event}`);
     });
 

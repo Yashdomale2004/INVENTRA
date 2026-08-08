@@ -409,8 +409,8 @@ export function TrackPage() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tracking Number</p>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{activeResult.trackingNumber}</p>
+                <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{activeResult.trackingNumber}</p>
                   <button
                     type="button"
                     onClick={() => copyTrackingNumber(activeResult.trackingNumber)}
