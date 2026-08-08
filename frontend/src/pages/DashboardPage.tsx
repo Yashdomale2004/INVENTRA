@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertOctagon, AlertTriangle, Boxes, CheckCircle2, PackageX } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronUp, PackageX } from "lucide-react";
 
 import { EmptyState } from "../components/shared/EmptyState";
 import { Card } from "../components/ui/card";
@@ -91,6 +91,7 @@ export function DashboardPage() {
 
   const products = overview?.products ?? [];
   const attentionItems = useMemo(() => getAttentionItems(overview?.products ?? []), [overview]);
+  const [isAttentionOpen, setIsAttentionOpen] = useState(false);
 
   return (
     <div className="w-full min-w-0 space-y-5 pb-8">
@@ -139,38 +140,52 @@ export function DashboardPage() {
 
       {attentionItems.length ? (
         <Card className="min-w-0 rounded-3xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-900 dark:bg-amber-950/10 sm:p-5">
-          <div className="mb-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setIsAttentionOpen((open) => !open)}
+            aria-expanded={isAttentionOpen}
+            className={`min-w-0 w-full text-left ${isAttentionOpen ? "mb-3" : ""}`}
+          >
             <div className="flex min-w-0 items-center justify-between gap-2">
               <h3 className="flex min-w-0 items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span className="truncate">Attention Needed</span>
               </h3>
-              <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                {attentionItems.length}
-              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                  {attentionItems.length}
+                </span>
+                {isAttentionOpen ? (
+                  <ChevronUp className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                )}
+              </div>
             </div>
             <p className="mt-0.5 truncate text-xs text-amber-700/80 dark:text-amber-400/80">Low, critical, and out-of-stock sizes</p>
-          </div>
-          <div className="space-y-2">
-            {attentionItems.map((item) => (
-              <div
-                key={item.key}
-                className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-white px-3 py-2.5 dark:border-amber-900/50 dark:bg-slate-950"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {item.productName} <span className="text-slate-400">({item.size})</span>
-                  </p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {item.brandName} &middot; {item.stock} left &middot; min {item.minimumStock}
-                  </p>
+          </button>
+          {isAttentionOpen ? (
+            <div className="space-y-2">
+              {attentionItems.map((item) => (
+                <div
+                  key={item.key}
+                  className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-white px-3 py-2.5 dark:border-amber-900/50 dark:bg-slate-950"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {item.productName} <span className="text-slate-400">({item.size})</span>
+                    </p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {item.brandName} &middot; {item.stock} left &middot; min {item.minimumStock}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${STOCK_STATUS_BADGE_CLASS[item.status]}`}>
+                    {STOCK_STATUS_SHORT_LABEL[item.status]}
+                  </span>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${STOCK_STATUS_BADGE_CLASS[item.status]}`}>
-                  {STOCK_STATUS_SHORT_LABEL[item.status]}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
