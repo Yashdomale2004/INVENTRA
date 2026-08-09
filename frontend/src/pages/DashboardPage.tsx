@@ -92,10 +92,10 @@ export function DashboardPage() {
   const products = overview?.products ?? [];
   const attentionItems = useMemo(() => getAttentionItems(overview?.products ?? []), [overview]);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
-  const [collapsedProductIds, setCollapsedProductIds] = useState<Set<string>>(new Set());
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
 
   const toggleProduct = (id: string) => {
-    setCollapsedProductIds((current) => {
+    setExpandedProductIds((current) => {
       const next = new Set(current);
       if (next.has(id)) {
         next.delete(id);
@@ -209,7 +209,7 @@ export function DashboardPage() {
           <EmptyState title="No stock available" description="Add stock via Stock Up to see it here." />
         ) : (
           products.map((product) => {
-            const isExpanded = !collapsedProductIds.has(product.id);
+            const isExpanded = expandedProductIds.has(product.id);
 
             return (
               <Card
