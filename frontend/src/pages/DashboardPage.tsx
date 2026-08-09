@@ -92,6 +92,19 @@ export function DashboardPage() {
   const products = overview?.products ?? [];
   const attentionItems = useMemo(() => getAttentionItems(overview?.products ?? []), [overview]);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
+  const [collapsedProductIds, setCollapsedProductIds] = useState<Set<string>>(new Set());
+
+  const toggleProduct = (id: string) => {
+    setCollapsedProductIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="w-full min-w-0 space-y-3 pb-8 sm:space-y-5">
@@ -195,46 +208,64 @@ export function DashboardPage() {
         ) : products.length === 0 ? (
           <EmptyState title="No stock available" description="Add stock via Stock Up to see it here." />
         ) : (
-          products.map((product) => (
-            <Card
-              key={product.id}
-              className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:rounded-3xl sm:p-5"
-            >
-              <div className="flex min-w-0 items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100 sm:text-base">{product.name}</p>
-                  <p className="truncate text-xs text-slate-400">{product.brandName}</p>
-                </div>
-                <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">{product.total} pcs</span>
-              </div>
+          products.map((product) => {
+            const isExpanded = !collapsedProductIds.has(product.id);
 
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-5 sm:gap-2.5">
-                {product.sizes.map((sizeRow) => (
-                  <div
-                    key={sizeRow.size}
-                    className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/70 sm:rounded-2xl sm:p-3"
-                  >
-                    <div className="flex min-w-0 items-center justify-between gap-1.5">
-                      <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{sizeRow.size}</p>
-                      <p className="min-w-0 truncate text-sm font-bold text-slate-900 dark:text-slate-100">{sizeRow.stock}</p>
-                    </div>
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                      <div
-                        className={`h-full rounded-full transition-all ${STOCK_STATUS_BAR_CLASS[sizeRow.status]}`}
-                        style={{ width: `${getStockBarPercent(sizeRow.stock)}%` }}
-                      />
-                    </div>
-                    <div className="mt-1.5 min-w-0 space-y-0.5">
-                      <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                        {STOCK_STATUS_SHORT_LABEL[sizeRow.status]}
-                      </p>
-                      <p className="truncate text-[10px] text-slate-400">Min {sizeRow.minimumStock}</p>
-                    </div>
+            return (
+              <Card
+                key={product.id}
+                className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:rounded-3xl sm:p-5"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleProduct(product.id)}
+                  aria-expanded={isExpanded}
+                  className="flex min-w-0 w-full items-center justify-between gap-2 text-left"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100 sm:text-base">{product.name}</p>
+                    <p className="truncate text-xs text-slate-400">{product.brandName}</p>
                   </div>
-                ))}
-              </div>
-            </Card>
-          ))
+                  <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{product.total} pcs</span>
+                    {isExpanded ? (
+                      <ChevronUp className="h-3.5 w-3.5 text-slate-400 sm:h-4 sm:w-4" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 text-slate-400 sm:h-4 sm:w-4" />
+                    )}
+                  </div>
+                </button>
+
+                {isExpanded ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-5 sm:gap-2.5">
+                    {product.sizes.map((sizeRow) => (
+                      <div
+                        key={sizeRow.size}
+                        className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/70 sm:rounded-2xl sm:p-3"
+                      >
+                        <div className="flex min-w-0 items-center justify-between gap-1.5">
+                          <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{sizeRow.size}</p>
+                          <p className="min-w-0 truncate text-sm font-bold text-slate-900 dark:text-slate-100">{sizeRow.stock}</p>
+                        </div>
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                          <div
+                            className={`h-full rounded-full transition-all ${STOCK_STATUS_BAR_CLASS[sizeRow.status]}`}
+                            style={{ width: `${getStockBarPercent(sizeRow.stock)}%` }}
+                          />
+                        </div>
+                        <div className="mt-1.5 min-w-0 space-y-0.5">
+                          <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                            {STOCK_STATUS_SHORT_LABEL[sizeRow.status]}
+                          </p>
+                          <p className="truncate text-[10px] text-slate-400">Min {sizeRow.minimumStock}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </Card>
+            );
+          })
         )}
       </div>
     </div>

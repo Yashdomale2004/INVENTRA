@@ -58,7 +58,7 @@ export function AppLayout() {
         <header className="mb-3 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:mb-4 sm:rounded-3xl sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <Link to="/home" className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white sm:h-10 sm:w-10 sm:rounded-2xl sm:text-lg">I</div>
+              <img src="/favicon.svg" alt="Inventra logo" className="h-8 w-8 shrink-0 sm:h-10 sm:w-10" />
               <div className="min-w-0">
                 <h1 className="truncate text-base font-black tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl">Inventra</h1>
                 <p className="hidden truncate text-xs text-slate-500 dark:text-slate-400 sm:block">Inventory and Parcel Tracking</p>

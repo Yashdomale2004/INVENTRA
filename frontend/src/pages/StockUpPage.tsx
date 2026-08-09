@@ -244,7 +244,7 @@ export function StockUpPage() {
               <ChevronDown className={`h-4 w-4 text-slate-500 transition ${expanded.printed ? "rotate-180" : ""}`} />
             </button>
 
-            <div className={`transition-all duration-300 ${expanded.printed ? "max-h-[640px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
+            <div className={`transition-all duration-300 ${expanded.printed ? "max-h-[760px] p-3 opacity-100" : "max-h-0 p-0 opacity-0"}`}>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Select Product</label>
               <Select value={printedProduct} onChange={(event) => setPrintedProduct(event.target.value)}>
                 <option value="">Choose printed product</option>
