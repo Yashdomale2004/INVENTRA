@@ -1,4 +1,20 @@
-import { Box, CheckCircle2, Download, Eye, FileDown, Lock, Pencil, Printer, Search, Trash2, Truck, X, ZoomIn } from "lucide-react";
+import {
+  Box,
+  CheckCircle2,
+  Clock,
+  Download,
+  Eye,
+  FileDown,
+  Lock,
+  Package,
+  Pencil,
+  Printer,
+  Search,
+  Trash2,
+  Truck,
+  X,
+  ZoomIn,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -6,6 +22,7 @@ import type { Worker as TesseractWorker } from "tesseract.js";
 
 import { Card } from "../components/ui/card";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { WarehouseSceneLeft, WarehouseSceneRight } from "../components/shared/WarehouseScene";
 import { useAuth } from "../contexts/AuthContext";
 import { getErrorMessage } from "../lib/errors";
 import { notifyInventorySync } from "../lib/inventorySync";
@@ -16,6 +33,7 @@ import { fetchEnquiries, hideEnquiry, updateEnquiry, updateEnquiryStatus, type E
 type OrderDisplayStatus = "New" | "Printing" | "Dispatch" | "Delivered";
 type DateFilter = "all" | "today" | "thisMonth" | "custom";
 type SearchField = "all" | "orderId" | "customerName" | "product";
+type DeliveredSearchField = "all" | "invoiceNumber" | "customerName" | "product";
 type OrderHistoryEntry = {
   orderId: string;
   customerName: string;
@@ -27,11 +45,35 @@ type OrderHistoryEntry = {
   trackingNumber: string;
   raw: EnquiryRecord;
 };
+function matchesInvoiceQuery(orderId: string, rawQuery: string): boolean {
+  const id = orderId.trim().toLowerCase();
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return false;
+  if (id === query) return true;
+
+  // Order IDs are formatted like "INV021" — allow matching by the numeric
+  // part alone (e.g. "21" or "021") regardless of the "INV" prefix or padding.
+  const idDigits = id.match(/(\d+)$/)?.[1];
+  const queryDigits = query.match(/(\d+)$/)?.[1];
+  if (idDigits && queryDigits) {
+    return parseInt(idDigits, 10) === parseInt(queryDigits, 10);
+  }
+  return false;
+}
+
 type EditFormState = {
   customerName: string;
   customRequirement: string;
   trackingNumber: string;
   orderStatus: OrderStatus;
+};
+
+// Desktop dashboard only — literal class strings (not interpolated) so Tailwind's scanner picks them up.
+const KPI_ACCENT_CLASS: Record<"blue" | "amber" | "cyan" | "emerald", string> = {
+  blue: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+  amber: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+  cyan: "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300",
+  emerald: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
 };
 
 const WORKFLOW: OrderStatus[] = ["New", "Giving for Printing", "In Printing", "Yet to Pack", "Dispatch", "Received"];
@@ -309,6 +351,8 @@ export function HomePage() {
   const [customRange, setCustomRange] = useState({ start: "", end: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [searchField, setSearchField] = useState<SearchField>("all");
+  const [deliveredSearchTerm, setDeliveredSearchTerm] = useState("");
+  const [deliveredSearchField, setDeliveredSearchField] = useState<DeliveredSearchField>("all");
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const [detailOrder, setDetailOrder] = useState<EnquiryRecord | null>(null);
@@ -422,6 +466,52 @@ export function HomePage() {
       return matchesStatus && matchesSearch && matchesDate;
     });
   }, [activeHistory, statusFilter, dateFilter, customRange, searchTerm, searchField]);
+
+  const filteredDeliveredOrders = useMemo(() => {
+    const query = deliveredSearchTerm.trim().toLowerCase();
+    if (!query) return deliveredOrders;
+
+    return deliveredOrders.filter((entry) => {
+      if (deliveredSearchField === "all") {
+        return (
+          matchesInvoiceQuery(entry.orderId, deliveredSearchTerm) ||
+          entry.customerName.toLowerCase().includes(query) ||
+          entry.product.toLowerCase().includes(query)
+        );
+      }
+      if (deliveredSearchField === "invoiceNumber") {
+        return matchesInvoiceQuery(entry.orderId, deliveredSearchTerm);
+      }
+      if (deliveredSearchField === "customerName") {
+        return entry.customerName.toLowerCase().includes(query);
+      }
+      return entry.product.toLowerCase().includes(query);
+    });
+  }, [deliveredOrders, deliveredSearchTerm, deliveredSearchField]);
+
+  // Desktop dashboard only — derived purely from `history`, already fetched above.
+  const dispatchOrders = useMemo(
+    () => history.filter((entry) => entry.orderStatus === "Dispatch"),
+    [history]
+  );
+  const pendingOrders = useMemo(
+    () =>
+      history.filter((entry) =>
+        (["New", "Pending", "Giving for Printing", "In Printing", "Yet to Pack"] as OrderStatus[]).includes(entry.orderStatus)
+      ),
+    [history]
+  );
+  const workflowCounts = useMemo(() => {
+    const counts = new Map<OrderStatus, number>(WORKFLOW.map((stage) => [stage, 0]));
+    for (const entry of history) {
+      if (entry.orderStatus === "Pending") {
+        counts.set("New", (counts.get("New") ?? 0) + 1);
+      } else if (counts.has(entry.orderStatus)) {
+        counts.set(entry.orderStatus, (counts.get(entry.orderStatus) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [history]);
 
   const exportHistory = (format: "excel" | "pdf") => {
     if (format === "excel") {
@@ -754,9 +844,13 @@ export function HomePage() {
   };
 
   return (
-    <div className="space-y-4">
+    <>
+    <div className="space-y-4 lg:hidden">
       <section className="overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-600 to-cyan-500 p-4 text-white shadow-lg shadow-blue-200/70 sm:rounded-3xl sm:p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Inventra</p>
+        <div className="flex items-center gap-1.5">
+          <img src="/logo.png" alt="Inventra logo" className="h-4 w-4 shrink-0" />
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Inventra</p>
+        </div>
         <h1 className="mt-1 text-xl font-extrabold sm:text-2xl">Welcome, {user?.first_name || user?.username}</h1>
       </section>
 
@@ -815,10 +909,10 @@ export function HomePage() {
 
           {isSummaryOpen ? (
             <div className="mt-4 space-y-2 pl-[26px]">
-              {history.length === 0 ? (
-                <p className="text-sm text-slate-400">No orders yet. Create an enquiry to get started.</p>
+              {activeHistory.length === 0 ? (
+                <p className="text-sm text-slate-400">No active orders. Create an enquiry to get started.</p>
               ) : (
-                history.map((entry) => {
+                activeHistory.map((entry) => {
                     const order = entry.raw;
                     const workflowIdx = Math.max(WORKFLOW.indexOf(order.orderStatus as OrderStatus), 0);
                     const isExpanded = expandedOrderId === order.id;
@@ -1143,8 +1237,30 @@ export function HomePage() {
 
             {isDeliveredOpen ? (
               <div className="space-y-3">
-                {deliveredOrders.length ? (
-                  deliveredOrders.map((entry) => (
+                <div className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row sm:items-center sm:gap-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={deliveredSearchTerm}
+                      onChange={(event) => setDeliveredSearchTerm(event.target.value)}
+                      placeholder="Search invoice number"
+                      className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                  <select
+                    value={deliveredSearchField}
+                    onChange={(event) => setDeliveredSearchField(event.target.value as DeliveredSearchField)}
+                    className="h-11 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:border-blue-400 sm:w-auto dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    <option value="all">All Fields</option>
+                    <option value="invoiceNumber">Invoice / Order ID (exact)</option>
+                    <option value="customerName">Customer Name</option>
+                    <option value="product">Product</option>
+                  </select>
+                </div>
+
+                {filteredDeliveredOrders.length ? (
+                  filteredDeliveredOrders.map((entry) => (
                     <div key={entry.raw.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -1182,7 +1298,7 @@ export function HomePage() {
                   ))
                 ) : (
                   <p className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                    No delivered orders yet.
+                    {deliveredSearchTerm.trim() ? "No delivered orders match your search." : "No delivered orders yet."}
                   </p>
                 )}
               </div>
@@ -1190,6 +1306,7 @@ export function HomePage() {
           </div>
         </Card>
       </section>
+    </div>
 
       {detailOrder ? (
         <div
@@ -1487,6 +1604,215 @@ export function HomePage() {
         onConfirm={confirmDeleteOrder}
         onCancel={cancelDeleteOrder}
       />
-    </div>
+
+      {/* ══════════════════════════════════════════════════════════════
+          DESKTOP DASHBOARD (lg+ only) — mobile view above is untouched.
+          Every number here is derived from `history`, already fetched
+          above; nothing on this page is fabricated.
+         ══════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:block">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60 dark:border-transparent dark:bg-[#050914] dark:shadow-[0_40px_100px_-24px_rgba(0,0,0,0.85)]">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 hidden dark:block dark:bg-[radial-gradient(circle_at_12%_8%,rgba(28,58,110,0.32)_0%,rgba(5,9,20,0.97)_45%,#010306_100%)]"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 hidden opacity-[0.05] dark:block"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(148,197,255,0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,197,255,0.5) 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+          <WarehouseSceneLeft className="pointer-events-none absolute left-0 top-0 hidden h-full w-40 opacity-30 dark:block" />
+          <WarehouseSceneRight className="pointer-events-none absolute right-0 top-0 hidden h-full w-40 opacity-30 dark:block" />
+
+          <div className="relative space-y-6">
+            {/* ── Header ─────────────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-300/70">Dashboard</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-900 dark:text-white">Welcome back, {user?.first_name || user?.username}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-white/50">Here's what's happening with your inventory today.</p>
+              </div>
+              <Link
+                to="/enquiry"
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:from-blue-500 hover:to-cyan-400"
+              >
+                <Search className="h-4 w-4" /> New Enquiry
+              </Link>
+            </div>
+
+            {/* ── KPI cards ──────────────────────────────────────── */}
+            <div className="grid grid-cols-4 gap-4">
+              {(
+                [
+                  { label: "Total Orders", value: history.length, icon: Package, accent: "blue" as const },
+                  { label: "Pending Orders", value: pendingOrders.length, icon: Clock, accent: "amber" as const },
+                  { label: "Dispatch Orders", value: dispatchOrders.length, icon: Truck, accent: "cyan" as const },
+                  { label: "Delivered Orders", value: deliveredOrders.length, icon: CheckCircle2, accent: "emerald" as const },
+                ]
+              ).map(({ label, value, icon: Icon, accent }) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none dark:backdrop-blur-xl"
+                >
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${KPI_ACCENT_CLASS[accent]}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <p className="mt-4 text-3xl font-black text-slate-900 dark:text-white">{value}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Order Status Flow ─────────────────────────────────*/}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none dark:backdrop-blur-xl">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-white/70">Order Status Flow</h3>
+              <p className="mt-1 text-xs text-slate-400 dark:text-white/40">New → Giving for Printing → In Printing → Yet to Pack → Dispatch → Received</p>
+              <div className="relative mt-8">
+                <div className="absolute left-6 right-6 top-6 h-px bg-slate-200 dark:bg-white/10" />
+                <div className="relative grid grid-cols-6 gap-4">
+                  {WORKFLOW.map((stage) => (
+                    <div key={stage} className="flex flex-col items-center gap-2 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-lg font-black text-blue-700 dark:border-blue-400/30 dark:bg-[#0b1220] dark:text-blue-200">
+                        {workflowCounts.get(stage) ?? 0}
+                      </div>
+                      <p className="text-[10px] font-semibold leading-tight text-slate-500 dark:text-white/50">{stage}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Order Summary ──────────────────────────────────────*/}
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none dark:backdrop-blur-xl">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-white/70">Order Summary</h3>
+                <div className="mt-4 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                  {activeHistory.length === 0 ? (
+                    <p className="text-sm text-slate-400 dark:text-white/40">No active orders. Create an enquiry to get started.</p>
+                  ) : (
+                    activeHistory.map((entry) => {
+                      const order = entry.raw;
+                      const workflowIdx = Math.max(WORKFLOW.indexOf(order.orderStatus as OrderStatus), 0);
+                      const isExpanded = expandedOrderId === order.id;
+
+                      return (
+                        <div
+                          key={order.id}
+                          className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-white/[0.03]"
+                        >
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:border-blue-300 dark:hover:border-blue-400/30"
+                            onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                                {entry.orderId} · {entry.customerName}
+                              </p>
+                              <div className="mt-1.5 flex items-center gap-1">
+                                {WORKFLOW.map((stage, i) => (
+                                  <span
+                                    key={stage}
+                                    className={`h-1.5 w-5 rounded-full ${i <= workflowIdx ? "bg-blue-400" : "bg-slate-200 dark:bg-white/10"}`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${getStatusBadgeClass(order.orderStatus)}`}>
+                              {order.orderStatus}
+                            </span>
+                          </button>
+
+                          {isExpanded ? (
+                            <div className="space-y-1.5 border-t border-slate-200 px-3 pb-3 pt-2.5 dark:border-white/10">
+                              {WORKFLOW.map((stage, index) => {
+                                const isDone = index < workflowIdx;
+                                const isCurrent = index === workflowIdx;
+                                const nextStage = WORKFLOW[index + 1] as OrderStatus | undefined;
+                                const histEntry = order.statusHistory.slice().reverse().find((h) => h.status === stage);
+
+                                return (
+                                  <div
+                                    key={stage}
+                                    className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 transition-all ${
+                                      isDone
+                                        ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                                        : isCurrent
+                                        ? "border-blue-300 bg-blue-50 dark:border-blue-800/40 dark:bg-blue-950/40"
+                                        : "border-slate-100 bg-slate-50 opacity-40 dark:border-white/5 dark:bg-white/[0.02]"
+                                    }`}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-2.5">
+                                      {isDone ? (
+                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                                      ) : isCurrent ? (
+                                        <div className="h-4 w-4 shrink-0 rounded-full border-2 border-blue-500 bg-white dark:bg-slate-900" />
+                                      ) : (
+                                        <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                      )}
+                                      <div className="min-w-0">
+                                        <p
+                                          className={`truncate text-xs font-semibold ${
+                                            isDone
+                                              ? "text-emerald-800 dark:text-emerald-300"
+                                              : isCurrent
+                                              ? "text-blue-900 dark:text-blue-300"
+                                              : "text-slate-500 dark:text-white/40"
+                                          }`}
+                                        >
+                                          {stage}
+                                        </p>
+                                        {histEntry ? (
+                                          <p className="truncate text-[10px] text-slate-400 dark:text-white/30">
+                                            {new Date(histEntry.updated_at).toLocaleString()}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    </div>
+
+                                    {isCurrent && nextStage ? (
+                                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                                        {stage === "Yet to Pack" ? (
+                                          <button
+                                            type="button"
+                                            className="rounded-lg border border-blue-300 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300"
+                                            onClick={() => openAddressPreview(order)}
+                                          >
+                                            Download Address PDF
+                                          </button>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          disabled={updatingOrderId === order.id}
+                                          className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                          onClick={() => handleWorkflowAdvance(order, nextStage)}
+                                        >
+                                          {updatingOrderId === order.id ? "…" : "Done"}
+                                        </button>
+                                      </div>
+                                    ) : isCurrent && !nextStage ? (
+                                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                        Completed!
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertOctagon, AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronUp, PackageX } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronUp, PackageX, Shirt } from "lucide-react";
 
 import { EmptyState } from "../components/shared/EmptyState";
 import { Card } from "../components/ui/card";
@@ -222,9 +222,12 @@ export function DashboardPage() {
                   aria-expanded={isExpanded}
                   className="flex min-w-0 w-full items-center justify-between gap-2 text-left"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100 sm:text-base">{product.name}</p>
-                    <p className="truncate text-xs text-slate-400">{product.brandName}</p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Shirt className="h-4 w-4 shrink-0 text-blue-600" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100 sm:text-base">{product.name}</p>
+                      <p className="truncate text-xs text-slate-400">{product.brandName}</p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{product.total} pcs</span>

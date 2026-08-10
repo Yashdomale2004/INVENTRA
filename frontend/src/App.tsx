@@ -14,7 +14,11 @@ const EnquiryPage = lazy(() => import("./pages/EnquiryPage").then((m) => ({ defa
 const StockUpPage = lazy(() => import("./pages/StockUpPage").then((m) => ({ default: m.StockUpPage })));
 const TrackPage = lazy(() => import("./pages/TrackPage").then((m) => ({ default: m.TrackPage })));
 const OrderStatusPage = lazy(() => import("./pages/OrderStatusPage").then((m) => ({ default: m.OrderStatusPage })));
+const DeliveredOrdersPage = lazy(() =>
+  import("./pages/DeliveredOrdersPage").then((m) => ({ default: m.DeliveredOrdersPage }))
+);
 const MorePage = lazy(() => import("./pages/MorePage").then((m) => ({ default: m.MorePage })));
+const ManagementPage = lazy(() => import("./pages/ManagementPage").then((m) => ({ default: m.ManagementPage })));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const ProductsPage = lazy(() => import("./pages/ProductsPage").then((m) => ({ default: m.ProductsPage })));
@@ -61,8 +65,10 @@ function App() {
               <Route path="enquiry" element={<EnquiryPage />} />
               <Route path="stock-up" element={<StockUpPage />} />
               <Route path="track" element={<TrackPage />} />
+              <Route path="delivered-orders" element={<DeliveredOrdersPage />} />
               <Route path="order-status" element={<OrderStatusPage />} />
               <Route path="more" element={<MorePage />} />
+              <Route path="management" element={<ManagementPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="stock-in" element={<Navigate to="/stock-up" replace />} />

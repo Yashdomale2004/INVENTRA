@@ -40,11 +40,17 @@ export function OrderStatusPage() {
   const [orders, setOrders] = useState<EnquiryRecord[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+  // Desktop "Order History" view — only active/running orders are shown here; delivered
+  // orders live on the separate Delivered Orders page. The underlying `orders` data is
+  // never filtered out of state, only out of what gets rendered/selected.
+  const activeOrders = useMemo(() => orders.filter((order) => order.orderStatus !== "Received"), [orders]);
+
   const refreshOrders = async () => {
     try {
       const savedOrders = await fetchEnquiries();
       setOrders(savedOrders);
-      setSelectedOrderId((current) => current ?? (savedOrders.length ? savedOrders[0].id : null));
+      const activeSavedOrders = savedOrders.filter((order) => order.orderStatus !== "Received");
+      setSelectedOrderId((current) => current ?? (activeSavedOrders.length ? activeSavedOrders[0].id : null));
       return savedOrders;
     } catch (error) {
       console.error("[OrderStatusPage] refreshOrders failed", error);
@@ -61,9 +67,15 @@ export function OrderStatusPage() {
     return () => window.removeEventListener(INVENTORY_SYNC_EVENT, handleChanged);
   }, []);
 
+  useEffect(() => {
+    if (selectedOrderId && !activeOrders.some((order) => order.id === selectedOrderId)) {
+      setSelectedOrderId(activeOrders.length ? activeOrders[0].id : null);
+    }
+  }, [activeOrders, selectedOrderId]);
+
   const selectedOrder = useMemo(
-    () => orders.find((order) => order.id === selectedOrderId) ?? null,
-    [orders, selectedOrderId]
+    () => activeOrders.find((order) => order.id === selectedOrderId) ?? null,
+    [activeOrders, selectedOrderId]
   );
 
   // Index within the workflow (Pending maps to -1 so it falls back gracefully)
@@ -134,16 +146,16 @@ export function OrderStatusPage() {
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Orders</p>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Saved Orders</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Active Orders</h2>
             </div>
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-              {orders.length} orders
+              {activeOrders.length} orders
             </span>
           </div>
 
           <div className="space-y-3">
-            {orders.length ? (
-              orders.map((order) => {
+            {activeOrders.length ? (
+              activeOrders.map((order) => {
                 const isActive = order.id === selectedOrderId;
                 return (
                   <button
@@ -170,7 +182,11 @@ export function OrderStatusPage() {
                 );
               })
             ) : (
-              <p className="text-sm text-slate-500">No saved enquiries yet. Create an enquiry to manage order status.</p>
+              <p className="text-sm text-slate-500">
+                {orders.length
+                  ? "No active orders — everything saved has been delivered."
+                  : "No saved enquiries yet. Create an enquiry to manage order status."}
+              </p>
             )}
           </div>
         </Card>

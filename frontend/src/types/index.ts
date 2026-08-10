@@ -129,7 +129,7 @@ export type Supplier = {
 
 export type Category = { id: string; name: string; description: string; status: boolean };
 
-export type Brand = { id: string; name: string; description: string; status: boolean };
+export type Brand = { id: string; name: string; description: string; status: boolean; logo_url?: string | null };
 
 export type StockTransaction = {
   id: string;

@@ -302,6 +302,65 @@ export async function createBrand(payload: Partial<Brand>) {
   return data;
 }
 
+/** Creates a brand and, if a logo file is supplied, uploads it and stores the public URL. */
+export async function createBrandWithLogo(name: string, logoFile: File | null) {
+  const userId = await getCurrentUserId();
+  const brand = await createBrand({ name, description: "", status: true });
+
+  if (logoFile) {
+    const filePath = `${userId}/${crypto.randomUUID()}-${logoFile.name}`;
+    const { error: uploadError } = await supabase.storage.from("brand-logos").upload(filePath, logoFile);
+    if (!uploadError) {
+      const { data: publicData } = supabase.storage.from("brand-logos").getPublicUrl(filePath);
+      const { data: updated, error: updateError } = await supabase
+        .from("brands")
+        .update({ logo_url: publicData.publicUrl, updated_by: userId })
+        .eq("id", brand.id)
+        .select("*")
+        .single();
+      if (!updateError) return updated;
+    }
+  }
+
+  return brand;
+}
+
+export async function updateBrand(id: string, payload: { name: string; logoFile?: File | null }) {
+  const userId = await getCurrentUserId();
+  const updatePayload: Record<string, unknown> = { name: payload.name, updated_by: userId };
+
+  if (payload.logoFile) {
+    const filePath = `${userId}/${crypto.randomUUID()}-${payload.logoFile.name}`;
+    const { error: uploadError } = await supabase.storage.from("brand-logos").upload(filePath, payload.logoFile);
+    if (!uploadError) {
+      const { data: publicData } = supabase.storage.from("brand-logos").getPublicUrl(filePath);
+      updatePayload.logo_url = publicData.publicUrl;
+    }
+  }
+
+  const { data, error } = await supabase.from("brands").update(updatePayload).eq("id", id).select("*").single();
+  if (error) throw error;
+  return data as Brand;
+}
+
+export async function deleteBrand(id: string) {
+  const userId = await getCurrentUserId();
+  const { error } = await supabase
+    .from("brands")
+    .update({ deleted_at: new Date().toISOString(), updated_by: userId, status: false })
+    .eq("id", id);
+  if (error) throw error;
+  return { ok: true };
+}
+
+/** Finds an existing category by (case-insensitive) name for the current user, creating it if missing. */
+export async function findOrCreateCategoryByName(name: string): Promise<string> {
+  const userId = await getCurrentUserId();
+  const id = await resolveCategory(userId, name);
+  if (!id) throw new Error(`Could not resolve or create category "${name}".`);
+  return id;
+}
+
 export async function fetchStockTransactions() {
   const { data, error } = await supabase
     .from("stock_entries")
@@ -938,6 +997,53 @@ export async function stockUpToSupabase(entries: StockUpEntry[]): Promise<{ sync
   }
 
   return { synced: stockInRows.length };
+}
+
+/** Logs stock-in quantities for a specific product's existing sizes (Management-created products). */
+export async function createStockInForProduct(
+  productId: string,
+  quantities: Record<string, number>
+): Promise<{ synced: number }> {
+  const userId = await getCurrentUserId();
+
+  const { data: sizeRows, error: sizeError } = await supabase
+    .from("product_sizes")
+    .select("id, size")
+    .eq("product_id", productId);
+  if (sizeError) throw sizeError;
+
+  const sizeIdByName = new Map<string, string>();
+  for (const row of sizeRows ?? []) {
+    sizeIdByName.set(row.size.toLowerCase().trim(), row.id);
+  }
+
+  const rows: Record<string, unknown>[] = [];
+  for (const [size, qty] of Object.entries(quantities)) {
+    if (!qty || qty <= 0) continue;
+    const sizeId = sizeIdByName.get(size.toLowerCase().trim());
+    if (!sizeId) continue;
+    rows.push({
+      created_by: userId,
+      product_id: productId,
+      product_size_id: sizeId,
+      transaction_type: "stock_in",
+      quantity: qty,
+      purchase_cost: 0,
+      color: "N/A",
+      distributor_id: null,
+      supplier_id: null,
+      invoice_number: `STOCKUP-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      notes: `Stock Up: ${size}`,
+      received_date: new Date().toISOString(),
+    });
+  }
+
+  if (rows.length) {
+    const { error } = await supabase.from("stock_entries").insert(rows);
+    if (error) throw error;
+  }
+
+  return { synced: rows.length };
 }
 
 export async function resetInventoryToZero() {

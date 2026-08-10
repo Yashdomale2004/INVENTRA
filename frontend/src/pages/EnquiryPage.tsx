@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, Minus, Plus, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Copy, FileDown, Minus, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Worker as TesseractWorker } from "tesseract.js";
@@ -7,11 +7,12 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import { useIsDesktopViewport } from "../hooks/useIsDesktopViewport";
 import { getErrorMessage } from "../lib/errors";
 import { INVENTORY_SYNC_EVENT, notifyInventorySync } from "../lib/inventorySync";
 import { createEmptyCombination, type OrderStatus, type RequirementCombination } from "../lib/orderStorage";
 import { createEnquiry, fetchEnquiries, type EnquiryRecord } from "../services/enquiries";
-import { deductStockForEnquiry, fetchInventoryByBrand, type BrandSizeStock } from "../services/inventory";
+import { deductStockForEnquiry, fetchBrands, fetchInventoryByBrand, type BrandSizeStock } from "../services/inventory";
 
 type BrandName = "Sunkool" | "Ceramic Shield" | "R S" | "Puma" | "Plain T-Shirts";
 type SizeName = "S" | "M" | "L" | "XL" | "XXL";
@@ -80,6 +81,7 @@ export function EnquiryPage() {
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [isManualAssigner, setIsManualAssigner] = useState(false);
   const [isExtractingAddress, setIsExtractingAddress] = useState(false);
+  const [isAddressDownloadMenuOpen, setIsAddressDownloadMenuOpen] = useState(false);
 
   const ocrWorkerRef = useRef<TesseractWorker | null>(null);
 
@@ -96,6 +98,20 @@ export function EnquiryPage() {
     queryFn: fetchInventoryByBrand,
   });
   const stockMap = useMemo(() => buildStockMap(brandStock), [brandStock]);
+
+  // Desktop only — brands added via Management should show up here without a code
+  // change; mobile keeps the fixed `brandOptions` list below untouched.
+  const isDesktop = useIsDesktopViewport();
+  const { data: managedBrands } = useQuery({
+    queryKey: ["brands"],
+    queryFn: fetchBrands,
+    enabled: isDesktop,
+  });
+  const desktopBrandOptions = useMemo(
+    () => (managedBrands?.length ? managedBrands.map((brand) => brand.name) : brandOptions),
+    [managedBrands]
+  );
+  const activeBrandOptions = isDesktop ? desktopBrandOptions : brandOptions;
 
   useEffect(() => {
     const refresh = () => queryClient.invalidateQueries({ queryKey: ["inventory-by-brand"] });
@@ -296,6 +312,46 @@ export function EnquiryPage() {
       console.error("[EnquiryPage] copy address failed", error);
       toast.error("Could not copy address.");
     }
+  };
+
+  const addressDownloadFilename = () => {
+    const base = form.customerName.trim() || "enquiry";
+    return base.replace(/\s+/g, "-").toLowerCase();
+  };
+
+  const downloadAddressAsTxt = () => {
+    const text = form.extractedAddress.trim() || "No address text available.";
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `shipping-address-${addressDownloadFilename()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setIsAddressDownloadMenuOpen(false);
+  };
+
+  const downloadAddressAsPdf = async () => {
+    const text = form.extractedAddress.trim() || "No address text available.";
+    const { jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const marginX = 22;
+    const maxWidth = doc.internal.pageSize.getWidth() - marginX * 2;
+    const lineHeightFactor = 1.6;
+    const lineHeightMm = doc.getFontSize() * lineHeightFactor * 0.3528;
+
+    let cursorY = 28;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("Shipping Address:", marginX, cursorY);
+    cursorY += lineHeightMm + 2;
+
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(text, maxWidth);
+    doc.text(lines, marginX, cursorY, { lineHeightFactor });
+
+    doc.save(`shipping-address-${addressDownloadFilename()}.pdf`);
+    setIsAddressDownloadMenuOpen(false);
   };
 
   const onUploadShippingImage = (file: File | null) => {
@@ -515,7 +571,7 @@ export function EnquiryPage() {
                           onChange={(event) => updateCombination(item.id, { brand: event.target.value as BrandName })}
                         >
                           <option value="">Select brand</option>
-                          {brandOptions.map((brand) => (
+                          {activeBrandOptions.map((brand) => (
                             <option key={brand} value={brand}>
                               {brand}
                             </option>
@@ -638,8 +694,39 @@ export function EnquiryPage() {
           {form.shippingImage ? (
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Extracted Address</label>
-                {isExtractingAddress ? <span className="text-[11px] text-slate-400">Extracting…</span> : null}
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Shipping Address</label>
+                <div className="flex items-center gap-2">
+                  {isExtractingAddress ? <span className="text-[11px] text-slate-400">Extracting…</span> : null}
+                  {form.extractedAddress ? (
+                    <div className="relative hidden lg:block">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddressDownloadMenuOpen((open) => !open)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      >
+                        <FileDown className="h-3.5 w-3.5" /> Download Address
+                      </button>
+                      {isAddressDownloadMenuOpen ? (
+                        <div className="absolute right-0 z-10 mt-1 w-28 rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                          <button
+                            type="button"
+                            onClick={downloadAddressAsPdf}
+                            className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
+                          >
+                            PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={downloadAddressAsTxt}
+                            className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
+                          >
+                            TXT
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
               <div className="relative">
                 <textarea
