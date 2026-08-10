@@ -54,11 +54,11 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
-      <div className="mx-auto w-full max-w-md px-3 pb-20 pt-3 sm:max-w-lg sm:px-4 sm:pb-24 sm:pt-4">
-        <header className="mb-3 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:mb-4 sm:rounded-3xl sm:p-4">
+      <div className="mx-auto w-full max-w-md px-3 pb-20 pt-3 sm:max-w-lg sm:px-4 sm:pb-24 sm:pt-4 md:max-w-3xl lg:max-w-5xl lg:px-6 lg:pt-6 xl:max-w-6xl 2xl:max-w-7xl">
+        <header className="mb-3 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:mb-4 sm:rounded-3xl sm:p-4 lg:mb-6">
           <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
             <Link to="/home" className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <img src="/favicon.svg" alt="Inventra logo" className="h-8 w-8 shrink-0 sm:h-10 sm:w-10" />
+              <img src="/logo.png" alt="Inventra logo" className="h-8 w-8 shrink-0 sm:h-10 sm:w-10" />
               <div className="min-w-0">
                 <h1 className="truncate text-base font-black tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl">Inventra</h1>
                 <p className="hidden truncate text-xs text-slate-500 dark:text-slate-400 sm:block">Inventory and Parcel Tracking</p>
@@ -100,11 +100,11 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="animate-[fadeIn_260ms_ease-out] rounded-2xl border border-slate-100 bg-slate-50/70 p-2 dark:border-slate-800 dark:bg-slate-900/40 sm:rounded-3xl sm:p-3">
+        <main className="animate-[fadeIn_260ms_ease-out] rounded-2xl border border-slate-100 bg-slate-50/70 p-2 dark:border-slate-800 dark:bg-slate-900/40 sm:rounded-3xl sm:p-3 lg:p-5">
           <Outlet />
         </main>
 
-        <nav className="fixed bottom-3 left-1/2 z-40 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-2xl border border-blue-100 bg-white/95 p-1.5 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 sm:bottom-4 sm:w-[calc(100%-2rem)] sm:rounded-3xl sm:p-2">
+        <nav className="fixed bottom-3 left-1/2 z-40 w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 rounded-2xl border border-blue-100 bg-white/95 p-1.5 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 sm:bottom-4 sm:w-[calc(100%-2rem)] sm:rounded-3xl sm:p-2 lg:max-w-xl">
           <div className="grid grid-cols-4 gap-1 sm:gap-2">
             {navItems.map((item) => {
               const Icon = item.icon;

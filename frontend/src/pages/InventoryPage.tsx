@@ -17,7 +17,7 @@ type ExpandState = {
 
 function SizeRows({ values }: { values: Record<"S" | "M" | "L" | "XL" | "XXL", number> }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {sizeOrder.map((size) => (
         <div key={size} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/70">
           <p className="text-xs uppercase tracking-wide text-slate-500">{size}</p>
@@ -97,6 +97,7 @@ export function InventoryPage() {
         </Card>
       </section>
 
+      <div className="space-y-4 lg:grid lg:grid-cols-3 lg:items-start lg:gap-4 lg:space-y-0">
       <Card className="rounded-3xl border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <button
           type="button"
@@ -189,6 +190,7 @@ export function InventoryPage() {
         </button>
         {expanded.puma ? <div className="mt-3"><SizeRows values={snapshot.puma} /></div> : null}
       </Card>
+      </div>
     </div>
   );
 }

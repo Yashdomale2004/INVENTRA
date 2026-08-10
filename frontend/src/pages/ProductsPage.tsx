@@ -293,7 +293,7 @@ export function ProductsPage() {
         {isLoading ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">Loading products...</p>
         ) : filtered.length ? (
-          <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((item) => (
               <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-start justify-between gap-2">

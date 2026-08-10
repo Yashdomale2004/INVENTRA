@@ -100,7 +100,7 @@ export function LoginPage() {
 
     try {
       await login(values.email, values.password);
-      navigate("/dashboard");
+      navigate("/home");
     } catch (error) {
       console.error("Login submit failed", error);
       toast.error(getErrorMessage(error, "Login failed. Check your email, password, or account verification status."));
@@ -123,7 +123,7 @@ export function LoginPage() {
       });
       toast.success("Account created successfully.");
       await login(values.email, values.password);
-      navigate("/dashboard");
+      navigate("/home");
     } catch (error: any) {
       console.error("Signup submit failed", error);
       toast.error(getErrorMessage(error, "Could not create account."));

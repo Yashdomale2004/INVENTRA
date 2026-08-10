@@ -104,7 +104,7 @@ export function DistributorManagementPage() {
       </Card>
       <Card>
         {filtered.length ? (
-          <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((item) => (
               <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                 <div className="min-w-0">
