@@ -54,6 +54,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
   const pill2Ref = useRef<HTMLDivElement>(null);
   const headline2Ref = useRef<HTMLDivElement>(null);
   const mockupRiseRef = useRef<HTMLDivElement>(null);
+  const floatRef = useRef<HTMLDivElement>(null);
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -62,8 +63,26 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
 
     const ctx = gsap.context(() => {
       // Ambient, scroll-independent drift — clouds/fog breathing gently.
-      gsap.to(cloudsRef.current, { x: 18, duration: 14, ease: "sine.inOut", yoyo: true, repeat: -1 });
-      gsap.to(fogRef.current, { opacity: 0.55, duration: 6, ease: "sine.inOut", yoyo: true, repeat: -1 });
+      // Created paused and only played while the hero is actually on screen (see
+      // scrollTrigger callbacks below) so they don't burn CPU/GPU once scrolled past.
+      const cloudDrift = gsap.to(cloudsRef.current, {
+        x: 18,
+        duration: 14,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+        paused: true,
+      });
+      const fogBreathe = gsap.to(fogRef.current, {
+        opacity: 0.55,
+        duration: 6,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+        paused: true,
+      });
+      cloudDrift.play();
+      fogBreathe.play();
 
       // ---- Master scroll timeline -------------------------------------
       // Positions are fractions (0-1) of the pinned scroll distance, matching:
@@ -81,6 +100,26 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
           scrub: 1,
           pin: true,
           anticipatePin: 1,
+          onEnter: () => {
+            cloudDrift.play();
+            fogBreathe.play();
+            if (floatRef.current) floatRef.current.style.animationPlayState = "running";
+          },
+          onLeave: () => {
+            cloudDrift.pause();
+            fogBreathe.pause();
+            if (floatRef.current) floatRef.current.style.animationPlayState = "paused";
+          },
+          onEnterBack: () => {
+            cloudDrift.play();
+            fogBreathe.play();
+            if (floatRef.current) floatRef.current.style.animationPlayState = "running";
+          },
+          onLeaveBack: () => {
+            cloudDrift.pause();
+            fogBreathe.pause();
+            if (floatRef.current) floatRef.current.style.animationPlayState = "paused";
+          },
         },
       });
 
@@ -93,7 +132,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
         .to(midMtnRef.current, { y: -34, ease: "none", duration: 0.5 }, 0.35)
         .to(foreMtnRef.current, { y: -58, ease: "none", duration: 0.5 }, 0.35)
         .to(cloudsRef.current, { y: -10, ease: "none", duration: 0.5 }, 0.35)
-        .to(headline1Ref.current, { opacity: 0, y: -34, filter: "blur(10px)", ease: "power2.inOut", duration: 0.16 }, 0.36)
+        .to(headline1Ref.current, { opacity: 0, y: -34, ease: "power2.inOut", duration: 0.16 }, 0.36)
         .to(
           [farMtnRef.current, backMtnRef.current, midMtnRef.current, foreMtnRef.current, cloudsRef.current, towerRef.current],
           { opacity: 0, ease: "power1.inOut", duration: 0.18 },
@@ -115,12 +154,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
 
       // Headline 2 + pill (0.65 - 0.82)
       tl.fromTo(pill2Ref.current, { opacity: 0, y: 10 }, { opacity: 1, y: 0, ease: "power2.out", duration: 0.08 }, 0.65)
-        .fromTo(
-          headline2Ref.current,
-          { opacity: 0, y: 20, filter: "blur(6px)" },
-          { opacity: 1, y: 0, filter: "blur(0px)", ease: "power2.out", duration: 0.12 },
-          0.68
-        );
+        .fromTo(headline2Ref.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: "power2.out", duration: 0.12 }, 0.68);
 
       // Dashboard rises (0.75 - 0.95)
       tl.fromTo(
@@ -177,9 +211,9 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
 
           {/* Clouds */}
           <div ref={cloudsRef} className={`absolute inset-0 ${settled ? "opacity-0" : ""}`} style={{ willChange: "transform, opacity" }} aria-hidden="true">
-            <div className="absolute left-[6%] top-[8%] h-[22%] w-[38%] rounded-full opacity-40 blur-2xl" style={{ background: `radial-gradient(closest-side, ${BEIGE}, transparent)` }} />
-            <div className="absolute right-[4%] top-[4%] h-[26%] w-[42%] rounded-full opacity-30 blur-2xl" style={{ background: `radial-gradient(closest-side, ${BEIGE}, transparent)` }} />
-            <div className="absolute left-[26%] top-[16%] h-[16%] w-[46%] rounded-full opacity-25 blur-3xl" style={{ background: `radial-gradient(closest-side, ${BEIGE}, transparent)` }} />
+            <div className="absolute left-[6%] top-[8%] h-[22%] w-[38%] rounded-full opacity-40 blur-xl sm:blur-2xl" style={{ background: `radial-gradient(closest-side, ${BEIGE}, transparent)` }} />
+            <div className="absolute right-[4%] top-[4%] h-[26%] w-[42%] rounded-full opacity-30 blur-xl sm:blur-2xl" style={{ background: `radial-gradient(closest-side, ${BEIGE}, transparent)` }} />
+            <div className="hidden opacity-25 blur-3xl sm:absolute sm:left-[26%] sm:top-[16%] sm:block sm:h-[16%] sm:w-[46%] sm:rounded-full" style={{ background: `radial-gradient(closest-side, ${BEIGE}, transparent)` }} />
           </div>
 
           {/* Mountains — organic bezier ridgelines, 4 depth layers */}
@@ -288,9 +322,10 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
             aria-hidden="true"
           />
 
-          {/* Grain */}
+          {/* Grain — desktop only; mix-blend-mode forces a full-viewport recomposite on
+              every scrub frame, which is the kind of cost mobile GPUs feel most. */}
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.06] mix-blend-overlay"
+            className="pointer-events-none absolute inset-0 hidden opacity-[0.05] sm:block"
             style={{
               backgroundImage:
                 "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
@@ -298,8 +333,13 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
             aria-hidden="true"
           />
 
-          {/* Vignette */}
-          <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_140px_50px_rgba(0,0,0,0.55)]" aria-hidden="true" />
+          {/* Vignette — a radial gradient reads the same as a blurred inset box-shadow
+              but is far cheaper to paint (no CPU-rasterized shadow blur). */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.55) 100%)" }}
+            aria-hidden="true"
+          />
 
           {/* Nav — inside the top of the viewport */}
           <header className="absolute inset-x-0 top-0 z-30 px-5 py-4 sm:px-8 sm:py-5">
@@ -309,7 +349,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
                 <span className="text-xs font-black tracking-[0.28em] text-white">INVENTRA</span>
               </Link>
 
-              <nav className="hidden items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2 py-1.5 backdrop-blur md:flex">
+              <nav className="hidden items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-1.5 md:flex">
                 {NAV_LINKS.map((link) => (
                   <a
                     key={link.label}
@@ -336,7 +376,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
               <button
                 type="button"
                 onClick={() => setMobileNavOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/30 text-slate-200 backdrop-blur md:hidden"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-black/50 text-slate-200 md:hidden"
                 aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
                 aria-expanded={mobileNavOpen}
               >
@@ -345,7 +385,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
             </div>
 
             {mobileNavOpen && (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/60 p-4 backdrop-blur md:hidden">
+              <div className="mt-3 rounded-2xl border border-white/10 bg-[#150b0d] p-4 md:hidden">
                 <div className="flex flex-col gap-3">
                   {NAV_LINKS.map((link) => (
                     <a key={link.label} href={link.href} onClick={() => setMobileNavOpen(false)} className="text-sm font-medium text-slate-200">
@@ -366,7 +406,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
           </header>
 
           {/* Headline 1 */}
-          <div ref={headline1Ref} className={`absolute inset-x-0 top-[56%] px-6 text-center ${settled ? "opacity-0" : ""}`} style={{ willChange: "transform, opacity, filter" }}>
+          <div ref={headline1Ref} className={`absolute inset-x-0 top-[56%] px-6 text-center ${settled ? "opacity-0" : ""}`} style={{ willChange: "transform, opacity" }}>
             <h1
               className="mx-auto max-w-3xl font-serif text-[1.7rem] uppercase leading-[0.95] tracking-wide sm:text-5xl"
               style={{ color: BEIGE }}
@@ -384,7 +424,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
           <div className="absolute inset-x-0 top-[10%] px-6 text-center sm:top-[25%]">
             <div
               ref={pill2Ref}
-              className={`mx-auto mb-3 flex w-fit items-center gap-2 rounded-full border border-white/10 bg-black/25 px-4 py-1.5 text-xs font-medium text-slate-100 backdrop-blur sm:mb-5 ${settled ? "" : "opacity-0"}`}
+              className={`mx-auto mb-3 flex w-fit items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-1.5 text-xs font-medium text-slate-100 sm:mb-5 ${settled ? "" : "opacity-0"}`}
               style={{ willChange: "transform, opacity" }}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -393,7 +433,7 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
             <h2
               ref={headline2Ref}
               className={`mx-auto max-w-xl font-serif text-xl leading-[1.05] sm:text-3xl sm:leading-[0.98] md:text-4xl ${settled ? "" : "opacity-0"}`}
-              style={{ color: BEIGE, willChange: "transform, opacity, filter" }}
+              style={{ color: BEIGE, willChange: "transform, opacity" }}
             >
               Everything stock-related,
               <br />
@@ -407,10 +447,8 @@ export function CinematicHero({ prefersReducedMotion }: { prefersReducedMotion: 
             className={`absolute inset-x-0 bottom-[2%] mx-auto w-[90%] sm:w-[75%] md:w-[53%] ${settled ? "" : "opacity-0"}`}
             style={{ willChange: "transform, opacity" }}
           >
-            <div className={settled ? "" : ""}>
-              <div className={prefersReducedMotion ? "" : "animate-[floatY_6s_ease-in-out_infinite]"}>
-                <DashboardMockup />
-              </div>
+            <div ref={floatRef} className={prefersReducedMotion ? "" : "animate-[floatY_6s_ease-in-out_infinite]"}>
+              <DashboardMockup />
             </div>
           </div>
         </div>
@@ -436,8 +474,8 @@ const ATTENTION_ROWS = [
 function DashboardMockup() {
   return (
     <div
-      className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_-20px_80px_-20px_rgba(232,135,156,0.4),0_30px_80px_-20px_rgba(0,0,0,0.7)] backdrop-blur-sm"
-      style={{ backgroundColor: "rgba(21,11,13,0.88)" }}
+      className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_-20px_80px_-20px_rgba(232,135,156,0.4),0_30px_80px_-20px_rgba(0,0,0,0.7)]"
+      style={{ backgroundColor: "rgba(17,9,11,0.97)" }}
     >
       <div className="flex items-center gap-3 border-b border-white/10 bg-black/30 px-4 py-2.5">
         <div className="flex gap-1.5">
