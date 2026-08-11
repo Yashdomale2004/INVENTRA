@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
-import { motion } from "framer-motion";
-import { Eye, EyeOff, Lock, Mail, ShieldCheck, Shirt, Truck } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "../components/ui/button";
-import { WarehouseSceneLeft, WarehouseSceneRight } from "../components/shared/WarehouseScene";
+import { GoogleIcon } from "../components/shared/GoogleIcon";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../contexts/AuthContext";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
@@ -20,17 +20,19 @@ const loginSchema = z.object({
   password: z.string().min(8),
 });
 
-const registerSchema = z.object({
-  first_name: z.string().min(2),
-  last_name: z.string().min(2),
-  username: z.string().min(3),
-  email: z.email(),
-  password: z.string().min(8),
-  confirmPassword: z.string().min(8),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match.",
-  path: ["confirmPassword"],
-});
+const registerSchema = z
+  .object({
+    first_name: z.string().min(2),
+    last_name: z.string().min(2),
+    username: z.string().min(3),
+    email: z.email(),
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
 
 type LoginValues = z.infer<typeof loginSchema>;
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -42,35 +44,27 @@ function getRememberedEmail(): string {
   return window.localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? "";
 }
 
-const darkInputBase = "!border-white/15 !bg-white/[0.06] !text-white placeholder:!text-white/30 transition-all duration-200";
+const fieldLabelClass = "mb-1.5 block text-xs font-semibold text-slate-600";
+const fieldInputBase =
+  "h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 transition-colors duration-150 focus:border-[#7A2145] focus:ring-4 focus:ring-[#7A2145]/12";
 
-function inputStateClass(hasError?: boolean) {
-  return hasError
-    ? "!border-rose-400/50 focus:!border-rose-400 focus:!ring-4 focus:!ring-rose-400/15"
-    : "hover:!border-white/25 focus:!border-blue-400 focus:!ring-4 focus:!ring-blue-400/20 focus:!bg-white/[0.08]";
+function fieldInputClass(hasError?: boolean) {
+  return hasError ? `${fieldInputBase} !border-rose-400 focus:!ring-rose-400/15` : fieldInputBase;
 }
 
-function darkInputClass(hasError?: boolean) {
-  return `${darkInputBase} ${inputStateClass(hasError)}`;
-}
-function iconInputClass(hasError?: boolean) {
-  return `${darkInputClass(hasError)} pl-10 pr-3`;
-}
-function passwordInputClass(hasError?: boolean) {
-  return `${darkInputClass(hasError)} pl-10 pr-10`;
-}
-const labelClass = "mb-1 block text-xs font-semibold uppercase tracking-wide text-white/50";
 const primaryButtonClass =
-  "group relative w-full overflow-hidden bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white shadow-[0_12px_32px_-10px_rgba(37,99,235,0.65)] transition-all duration-300 hover:shadow-[0_16px_40px_-8px_rgba(37,99,235,0.8)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050914] dark:text-white";
+  "group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-[#7A2145] text-sm font-semibold text-white shadow-[0_14px_28px_-10px_rgba(122,33,69,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#6A1C3B] hover:shadow-[0_18px_34px_-8px_rgba(122,33,69,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A2145]/40 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const getErrorMessage = (error: any, fallback: string) => {
     if (isAuthRetryableFetchError(error)) {
@@ -195,266 +189,333 @@ export function LoginPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (!hasSupabaseConfig) {
+      toast.error("Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env.");
+      return;
+    }
+
+    setIsGoogleLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/home` },
+      });
+      if (error) throw error;
+      // On success Supabase redirects the browser away from this page, so
+      // isGoogleLoading intentionally stays true until that navigation happens.
+    } catch (error) {
+      console.error("Google login failed", error);
+      toast.error(getErrorMessage(error, "Could not start Google sign-in."));
+      setIsGoogleLoading(false);
+    }
+  };
+
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050914] p-4">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(28,58,110,0.5)_0%,rgba(5,9,20,0.96)_42%,#010306_100%)]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-blue-500/[0.06] via-transparent to-black/40"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.08]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(148,197,255,0.5) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,197,255,0.5) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-      <div aria-hidden="true" className="pointer-events-none absolute left-[8%] top-[12%] h-72 w-72 rounded-full bg-blue-500/[0.18] blur-[120px]" />
-      <div aria-hidden="true" className="pointer-events-none absolute right-[10%] bottom-[10%] h-80 w-80 rounded-full bg-cyan-400/[0.14] blur-[130px]" />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.55)_100%)]"
-      />
-
-      <WarehouseSceneLeft className="pointer-events-none absolute left-[1%] top-[4%] hidden h-[88%] w-40 lg:block xl:w-48" />
-      <WarehouseSceneRight className="pointer-events-none absolute right-[1%] top-[4%] hidden h-[88%] w-40 lg:block xl:w-48" />
-
-      <motion.div
-        aria-hidden="true"
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute left-[6%] top-1/4 hidden w-48 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7)] backdrop-blur-xl lg:block"
-      >
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
-          <Shirt className="h-5 w-5" />
-        </div>
-        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">Live Stock Sync</p>
-        <p className="mt-1 text-sm font-semibold text-white/80">Real-time inventory</p>
-      </motion.div>
-
-      <motion.div
-        aria-hidden="true"
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
-        className="pointer-events-none absolute right-[6%] top-1/4 hidden w-48 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7)] backdrop-blur-xl lg:block"
-      >
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300">
-          <Truck className="h-5 w-5" />
-        </div>
-        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">Parcel Tracking</p>
-        <p className="mt-1 text-sm font-semibold text-white/80">Global shipments</p>
-      </motion.div>
-
-      <motion.div
-        aria-hidden="true"
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 2.4 }}
-        className="pointer-events-none absolute right-[8%] bottom-[14%] hidden w-48 rounded-2xl border border-white/[0.08] bg-white/[0.05] p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7)] backdrop-blur-xl xl:block"
-      >
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
-        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">Secure Access</p>
-        <p className="mt-1 text-sm font-semibold text-white/80">Encrypted &amp; backed up</p>
-      </motion.div>
-
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-md">
-        <div aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-[2.25rem] bg-blue-500/[0.16] blur-3xl" />
-
-        <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.07] shadow-[0_40px_100px_-24px_rgba(0,0,0,0.85)] ring-1 ring-inset ring-white/[0.04] backdrop-blur-2xl">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/[0.08] to-transparent"
-          />
-          <div className="relative p-7 sm:p-9">
-            <div className="mb-7 flex flex-col items-center gap-3 text-center">
-              <div className="relative">
-                <div aria-hidden="true" className="absolute inset-0 -z-10 rounded-full bg-blue-400/25 blur-xl" />
-                <img src="/logo.png" alt="Inventra logo" className="relative h-14 w-14" />
-              </div>
-              <span className="text-2xl font-black tracking-[0.3em] text-white">INVENTRA</span>
+    <div className="flex min-h-screen items-center justify-center bg-[#FBEADB] p-4 sm:p-6">
+      <div className="w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-[0_40px_100px_-30px_rgba(122,33,69,0.35)] ring-1 ring-black/5">
+        <div className="grid md:grid-cols-2">
+          {/* Left: illustration panel — hidden on mobile so the page simplifies to just the form.
+              The blob shapes, dots, and speech bubbles are baked into skeleton-hero.png itself,
+              so the panel background just matches the PNG's own peach fill for a seamless edge. */}
+          <div className="relative hidden flex-col overflow-hidden bg-[#FFE6C9] p-8 md:flex lg:p-10">
+            <div className="relative z-10 flex w-full flex-1 items-center justify-center">
+              <motion.img
+                src="/skeleton-hero.png"
+                alt="Illustration of a skeleton working at a laptop"
+                className="w-full max-w-[440px] rounded-[1.75rem] object-contain shadow-[0_20px_50px_-20px_rgba(122,33,69,0.35)]"
+                animate={prefersReducedMotion ? undefined : { y: [0, -10, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              />
             </div>
 
-            <div className="mb-6 flex rounded-2xl border border-white/10 bg-white/5 p-1">
-              {[
-                ["login", "Login"],
-                ["register", "Create Account"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setMode(value as "login" | "register")}
-                  className={`relative flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
-                    mode === value ? "text-white" : "text-white/50 hover:text-white/80"
-                  }`}
-                >
-                  {mode === value && (
-                    <motion.span
-                      layoutId="login-tab-pill"
-                      className="absolute inset-0 -z-10 rounded-xl bg-white/10 shadow-sm ring-1 ring-white/10"
-                      transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                    />
-                  )}
-                  {label}
-                </button>
-              ))}
+            <div className="relative z-10 mt-6">
+              <p className="text-2xl font-black leading-tight text-[#5B1730] lg:text-[28px]">
+                Every parcel, tracked.
+              </p>
+              <p className="mt-2 max-w-xs text-sm text-[#8A5A46]/90">
+                Manage inventory, stock, and shipments — all from one place.
+              </p>
             </div>
+          </div>
 
-            <h2 className="text-center text-3xl font-black tracking-tight text-white">
-              {mode === "login" ? "Welcome Back" : "Create your account"}
-            </h2>
-            <p className="mt-2 text-center text-sm text-white/55">
-              {mode === "login" && "Sign in to manage your inventory and parcels efficiently."}
-              {mode === "register" && "Enter your details to create your INVENTRA account."}
-            </p>
-            <div className="mx-auto mt-4 h-px w-10 bg-gradient-to-r from-blue-400 to-cyan-300" />
-
-            {!hasSupabaseConfig && (
-              <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-                Supabase env vars are missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env to enable login and data loading.
+          {/* Right: auth form */}
+          <div className="flex flex-col justify-center px-6 py-10 sm:px-10 sm:py-12 lg:px-14">
+            <div className="mx-auto w-full max-w-sm">
+              <div className="mb-8 flex items-center gap-2.5">
+                <img src="/logo.png" alt="Inventra logo" className="h-9 w-9 rounded-lg object-contain" />
+                <span className="text-sm font-black tracking-[0.28em] text-[#5B1730]">INVENTRA</span>
               </div>
-            )}
 
-            {mode === "login" && (
-              <form className="mt-6 space-y-4" onSubmit={handleLoginSubmit(onLogin)}>
-                <div>
-                  <label className={labelClass}>Email</label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                    <Input className={iconInputClass(!!loginErrors.email)} placeholder="you@company.com" type="email" {...registerLogin("email")} />
-                  </div>
-                  {loginErrors.email && <p className="mt-1 text-xs text-rose-300">{loginErrors.email.message}</p>}
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-[26px]">
+                {mode === "login" ? "Login to your Account" : "Create your Account"}
+              </h1>
+              <p className="mt-1.5 text-sm text-slate-500">
+                {mode === "login"
+                  ? "See what's going on with your inventory and shipments."
+                  : "Set up your INVENTRA account to start tracking stock."}
+              </p>
+
+              {!hasSupabaseConfig && (
+                <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  Supabase env vars are missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env to enable login and data
+                  loading.
                 </div>
-                <div>
-                  <label className={labelClass}>Password</label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                    <Input
-                      className={passwordInputClass(!!loginErrors.password)}
-                      type={showLoginPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      {...registerLogin("password")}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowLoginPassword((value) => !value)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 transition hover:text-white/75"
-                      aria-label={showLoginPassword ? "Hide password" : "Show password"}
-                      tabIndex={-1}
-                    >
-                      {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {loginErrors.password && <p className="mt-1 text-xs text-rose-300">{loginErrors.password.message}</p>}
-                </div>
+              )}
 
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex cursor-pointer select-none items-center gap-2 text-white/60">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(event) => setRememberMe(event.target.checked)}
-                      className="h-4 w-4 rounded border-white/25 bg-white/5 accent-blue-500"
-                    />
-                    Remember Me
-                  </label>
-                  <button type="button" onClick={handleForgotPassword} className="font-semibold text-blue-300 transition hover:text-blue-200">
-                    Forgot Password?
-                  </button>
-                </div>
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isGoogleLoading || !hasSupabaseConfig}
+                className="mt-6 flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A2145]/25 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-55"
+              >
+                <GoogleIcon className="h-4 w-4" />
+                {isGoogleLoading ? "Redirecting…" : "Continue with Google"}
+              </button>
 
-                <Button className={primaryButtonClass} disabled={isLoggingIn || !hasSupabaseConfig}>
-                  <span className="relative z-10">{isLoggingIn ? "Signing in..." : "Sign In"}</span>
-                  <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full" />
-                </Button>
-              </form>
-            )}
+              <div className="my-6 flex items-center gap-3">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                  {mode === "login" ? "or Sign in with Email" : "or Sign up with Email"}
+                </span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
 
-            {mode === "register" && (
-              <form className="mt-6 space-y-4" onSubmit={handleRegisterSubmit(onRegister)}>
-                <div className="grid gap-4 sm:grid-cols-2">
+              {mode === "login" && (
+                <form className="space-y-4" onSubmit={handleLoginSubmit(onLogin)} noValidate>
                   <div>
-                    <label className={labelClass}>First Name</label>
-                    <Input className={darkInputClass(!!registerErrors.first_name)} placeholder="First name" {...registerCreate("first_name")} />
-                    {registerErrors.first_name && <p className="mt-1 text-xs text-rose-300">{registerErrors.first_name.message}</p>}
+                    <label className={fieldLabelClass} htmlFor="login-email">
+                      Email
+                    </label>
+                    <Input
+                      id="login-email"
+                      className={fieldInputClass(!!loginErrors.email)}
+                      placeholder="mail@abc.com"
+                      type="email"
+                      autoComplete="email"
+                      aria-invalid={!!loginErrors.email}
+                      aria-describedby={loginErrors.email ? "login-email-error" : undefined}
+                      {...registerLogin("email")}
+                    />
+                    {loginErrors.email && (
+                      <p id="login-email-error" className="mt-1 text-xs text-rose-600">
+                        {loginErrors.email.message}
+                      </p>
+                    )}
                   </div>
+
                   <div>
-                    <label className={labelClass}>Last Name</label>
-                    <Input className={darkInputClass(!!registerErrors.last_name)} placeholder="Last name" {...registerCreate("last_name")} />
-                    {registerErrors.last_name && <p className="mt-1 text-xs text-rose-300">{registerErrors.last_name.message}</p>}
+                    <label className={fieldLabelClass} htmlFor="login-password">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        className={`${fieldInputClass(!!loginErrors.password)} pr-10`}
+                        type={showLoginPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        aria-invalid={!!loginErrors.password}
+                        aria-describedby={loginErrors.password ? "login-password-error" : undefined}
+                        {...registerLogin("password")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                        aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                        tabIndex={-1}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {loginErrors.password && (
+                      <p id="login-password-error" className="mt-1 text-xs text-rose-600">
+                        {loginErrors.password.message}
+                      </p>
+                    )}
                   </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Username</label>
-                  <Input className={darkInputClass(!!registerErrors.username)} placeholder="Username" {...registerCreate("username")} />
-                  {registerErrors.username && <p className="mt-1 text-xs text-rose-300">{registerErrors.username.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>Email</label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                    <Input className={iconInputClass(!!registerErrors.email)} placeholder="you@company.com" type="email" {...registerCreate("email")} />
-                  </div>
-                  {registerErrors.email && <p className="mt-1 text-xs text-rose-300">{registerErrors.email.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>Password</label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                    <Input
-                      className={passwordInputClass(!!registerErrors.password)}
-                      type={showRegisterPassword ? "text" : "password"}
-                      placeholder="Create a password"
-                      {...registerCreate("password")}
-                    />
+
+                  <div className="flex items-center justify-between text-sm">
+                    <label className="flex cursor-pointer select-none items-center gap-2 text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(event) => setRememberMe(event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 accent-[#7A2145]"
+                      />
+                      Remember Me
+                    </label>
                     <button
                       type="button"
-                      onClick={() => setShowRegisterPassword((value) => !value)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 transition hover:text-white/75"
-                      aria-label={showRegisterPassword ? "Hide password" : "Show password"}
-                      tabIndex={-1}
+                      onClick={handleForgotPassword}
+                      className="font-semibold text-[#7A2145] transition hover:text-[#5B1730] hover:underline"
                     >
-                      {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      Forgot Password?
                     </button>
                   </div>
-                  {registerErrors.password && <p className="mt-1 text-xs text-rose-300">{registerErrors.password.message}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>Confirm Password</label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+
+                  <Button type="submit" className={primaryButtonClass} disabled={isLoggingIn || !hasSupabaseConfig}>
+                    {isLoggingIn ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                        Signing in…
+                      </>
+                    ) : (
+                      "Login"
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              {mode === "register" && (
+                <form className="space-y-4" onSubmit={handleRegisterSubmit(onRegister)} noValidate>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className={fieldLabelClass} htmlFor="register-first-name">
+                        First Name
+                      </label>
+                      <Input
+                        id="register-first-name"
+                        className={fieldInputClass(!!registerErrors.first_name)}
+                        placeholder="First name"
+                        autoComplete="given-name"
+                        {...registerCreate("first_name")}
+                      />
+                      {registerErrors.first_name && <p className="mt-1 text-xs text-rose-600">{registerErrors.first_name.message}</p>}
+                    </div>
+                    <div>
+                      <label className={fieldLabelClass} htmlFor="register-last-name">
+                        Last Name
+                      </label>
+                      <Input
+                        id="register-last-name"
+                        className={fieldInputClass(!!registerErrors.last_name)}
+                        placeholder="Last name"
+                        autoComplete="family-name"
+                        {...registerCreate("last_name")}
+                      />
+                      {registerErrors.last_name && <p className="mt-1 text-xs text-rose-600">{registerErrors.last_name.message}</p>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={fieldLabelClass} htmlFor="register-username">
+                      Username
+                    </label>
                     <Input
-                      className={passwordInputClass(!!registerErrors.confirmPassword)}
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
-                      {...registerCreate("confirmPassword")}
+                      id="register-username"
+                      className={fieldInputClass(!!registerErrors.username)}
+                      placeholder="Username"
+                      autoComplete="username"
+                      {...registerCreate("username")}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword((value) => !value)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 transition hover:text-white/75"
-                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                      tabIndex={-1}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                    {registerErrors.username && <p className="mt-1 text-xs text-rose-600">{registerErrors.username.message}</p>}
                   </div>
-                  {registerErrors.confirmPassword && <p className="mt-1 text-xs text-rose-300">{registerErrors.confirmPassword.message}</p>}
-                </div>
-                <Button className={primaryButtonClass} disabled={isRegistering || !hasSupabaseConfig}>
-                  <span className="relative z-10">{isRegistering ? "Creating account..." : "Create Account"}</span>
-                  <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full" />
-                </Button>
-              </form>
-            )}
+
+                  <div>
+                    <label className={fieldLabelClass} htmlFor="register-email">
+                      Email
+                    </label>
+                    <Input
+                      id="register-email"
+                      className={fieldInputClass(!!registerErrors.email)}
+                      placeholder="mail@abc.com"
+                      type="email"
+                      autoComplete="email"
+                      {...registerCreate("email")}
+                    />
+                    {registerErrors.email && <p className="mt-1 text-xs text-rose-600">{registerErrors.email.message}</p>}
+                  </div>
+
+                  <div>
+                    <label className={fieldLabelClass} htmlFor="register-password">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="register-password"
+                        className={`${fieldInputClass(!!registerErrors.password)} pr-10`}
+                        type={showRegisterPassword ? "text" : "password"}
+                        placeholder="Create a password"
+                        autoComplete="new-password"
+                        {...registerCreate("password")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegisterPassword((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                        aria-label={showRegisterPassword ? "Hide password" : "Show password"}
+                        tabIndex={-1}
+                      >
+                        {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {registerErrors.password && <p className="mt-1 text-xs text-rose-600">{registerErrors.password.message}</p>}
+                  </div>
+
+                  <div>
+                    <label className={fieldLabelClass} htmlFor="register-confirm-password">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="register-confirm-password"
+                        className={`${fieldInputClass(!!registerErrors.confirmPassword)} pr-10`}
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirm your password"
+                        autoComplete="new-password"
+                        {...registerCreate("confirmPassword")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {registerErrors.confirmPassword && (
+                      <p className="mt-1 text-xs text-rose-600">{registerErrors.confirmPassword.message}</p>
+                    )}
+                  </div>
+
+                  <Button type="submit" className={primaryButtonClass} disabled={isRegistering || !hasSupabaseConfig}>
+                    {isRegistering ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                        Creating account…
+                      </>
+                    ) : (
+                      "Create Account"
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              <p className="mt-6 text-center text-sm text-slate-500">
+                {mode === "login" ? (
+                  <>
+                    Not Registered Yet?{" "}
+                    <button type="button" onClick={() => setMode("register")} className="font-semibold text-[#7A2145] hover:underline">
+                      Create an account
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Already have an account?{" "}
+                    <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#7A2145] hover:underline">
+                      Login
+                    </button>
+                  </>
+                )}
+              </p>
+            </div>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

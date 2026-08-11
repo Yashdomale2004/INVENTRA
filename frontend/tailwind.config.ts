@@ -11,6 +11,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["Sora", "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ["Playfair Display", "ui-serif", "Georgia", "serif"],
       },
       colors: {
         surface: "hsl(var(--surface))",

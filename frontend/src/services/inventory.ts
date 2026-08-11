@@ -999,53 +999,6 @@ export async function stockUpToSupabase(entries: StockUpEntry[]): Promise<{ sync
   return { synced: stockInRows.length };
 }
 
-/** Logs stock-in quantities for a specific product's existing sizes (Management-created products). */
-export async function createStockInForProduct(
-  productId: string,
-  quantities: Record<string, number>
-): Promise<{ synced: number }> {
-  const userId = await getCurrentUserId();
-
-  const { data: sizeRows, error: sizeError } = await supabase
-    .from("product_sizes")
-    .select("id, size")
-    .eq("product_id", productId);
-  if (sizeError) throw sizeError;
-
-  const sizeIdByName = new Map<string, string>();
-  for (const row of sizeRows ?? []) {
-    sizeIdByName.set(row.size.toLowerCase().trim(), row.id);
-  }
-
-  const rows: Record<string, unknown>[] = [];
-  for (const [size, qty] of Object.entries(quantities)) {
-    if (!qty || qty <= 0) continue;
-    const sizeId = sizeIdByName.get(size.toLowerCase().trim());
-    if (!sizeId) continue;
-    rows.push({
-      created_by: userId,
-      product_id: productId,
-      product_size_id: sizeId,
-      transaction_type: "stock_in",
-      quantity: qty,
-      purchase_cost: 0,
-      color: "N/A",
-      distributor_id: null,
-      supplier_id: null,
-      invoice_number: `STOCKUP-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      notes: `Stock Up: ${size}`,
-      received_date: new Date().toISOString(),
-    });
-  }
-
-  if (rows.length) {
-    const { error } = await supabase.from("stock_entries").insert(rows);
-    if (error) throw error;
-  }
-
-  return { synced: rows.length };
-}
-
 export async function resetInventoryToZero() {
   const userId = await getCurrentUserId();
   const { data: sizes, error: sizesError } = await supabase

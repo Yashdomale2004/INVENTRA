@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./app/ProtectedRoute";
 import { useTheme } from "./contexts/ThemeContext";
 import { AppLayout } from "./layouts/AppLayout";
 
+const LandingPage = lazy(() => import("./pages/LandingPage").then((m) => ({ default: m.LandingPage })));
 const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const HomePage = lazy(() => import("./pages/HomePage").then((m) => ({ default: m.HomePage })));
 const InventoryPage = lazy(() => import("./pages/InventoryPage").then((m) => ({ default: m.InventoryPage })));
@@ -49,17 +50,16 @@ function App() {
       <ChunkErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
 
             <Route
-              path="/"
               element={
                 <ProtectedRoute>
                   <AppLayout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/home" replace />} />
               <Route path="home" element={<HomePage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="enquiry" element={<EnquiryPage />} />
