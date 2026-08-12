@@ -84,7 +84,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 lg:flex">
       {/* ── Desktop sidebar (lg+ only) ───────────────────────────────── */}
-      <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-white/10 lg:bg-[#050914] lg:px-4 lg:py-6">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col lg:overflow-y-auto lg:border-r lg:border-white/10 lg:bg-[#050914] lg:px-4 lg:py-6">
         <Link to="/home" className="flex items-center gap-2.5 px-2">
           <img src="/logo.png" alt="Inventra logo" className="h-9 w-9" />
           <span className="text-lg font-black tracking-[0.2em] text-white">INVENTRA</span>
@@ -104,8 +104,10 @@ export function AppLayout() {
                 key={item.label}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
-                  isActive ? "bg-white/10 text-white shadow-sm ring-1 ring-white/10" : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
+                  isActive
+                    ? "bg-white/10 font-semibold text-white shadow-sm ring-1 ring-white/10"
+                    : "font-normal text-white/70 hover:bg-white/5 hover:text-white/90"
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -136,7 +138,7 @@ export function AppLayout() {
       </aside>
 
       {/* ── Shared content column (mobile chrome + single Outlet) ───── */}
-      <div className="mx-auto w-full max-w-md px-3 pb-20 pt-3 sm:max-w-lg sm:px-4 sm:pb-24 sm:pt-4 md:max-w-3xl lg:mx-0 lg:max-w-none lg:flex-1 lg:px-8 lg:pb-8 lg:pt-6">
+      <div className="mx-auto w-full max-w-md px-3 pb-20 pt-3 sm:max-w-lg sm:px-4 sm:pb-24 sm:pt-4 md:max-w-3xl lg:mx-0 lg:ml-64 lg:max-w-none lg:flex-1 lg:px-8 lg:pb-8 lg:pt-6">
         {/* Mobile/tablet header — unchanged, hidden at lg+ */}
         <header className="mb-3 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:mb-4 sm:rounded-3xl sm:p-4 lg:hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">

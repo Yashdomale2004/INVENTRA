@@ -1,16 +1,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
-import { motion, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "../components/ui/button";
+import { GhostIllustration } from "../components/shared/GhostIllustration";
 import { GoogleIcon } from "../components/shared/GoogleIcon";
 import { Input } from "../components/ui/input";
+import { HERO_BG, MUTED, NAVY, PAGE_BG } from "../components/landing/theme";
 import { useAuth } from "../contexts/AuthContext";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
 import { register as registerAccount } from "../services/auth";
@@ -46,20 +48,21 @@ function getRememberedEmail(): string {
 
 const fieldLabelClass = "mb-1.5 block text-xs font-semibold text-slate-600";
 const fieldInputBase =
-  "h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 transition-colors duration-150 focus:border-[#7A2145] focus:ring-4 focus:ring-[#7A2145]/12";
+  "h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 transition-colors duration-150 focus:border-[#1677FF] focus:ring-4 focus:ring-[#1677FF]/12";
 
 function fieldInputClass(hasError?: boolean) {
   return hasError ? `${fieldInputBase} !border-rose-400 focus:!ring-rose-400/15` : fieldInputBase;
 }
 
 const primaryButtonClass =
-  "group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-[#7A2145] text-sm font-semibold text-white shadow-[0_14px_28px_-10px_rgba(122,33,69,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#6A1C3B] hover:shadow-[0_18px_34px_-8px_rgba(122,33,69,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A2145]/40 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0";
+  "group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl bg-[#1677FF] text-sm font-semibold text-white shadow-[0_14px_28px_-10px_rgba(22,119,255,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#0F62E0] hover:shadow-[0_18px_34px_-8px_rgba(22,119,255,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1677FF]/40 focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-55 disabled:shadow-none disabled:hover:translate-y-0";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const prefersReducedMotion = useReducedMotion();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<"login" | "register">(searchParams.get("mode") === "register" ? "register" : "login");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -212,29 +215,51 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FBEADB] p-4 sm:p-6">
-      <div className="w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white shadow-[0_40px_100px_-30px_rgba(122,33,69,0.35)] ring-1 ring-black/5">
+    <div
+      className="relative flex min-h-screen w-full items-center justify-center overflow-x-hidden p-0 sm:p-6"
+      style={{ background: `radial-gradient(120% 90% at 50% 0%, ${HERO_BG} 0%, ${PAGE_BG} 65%)` }}
+    >
+      {/* Subtle atmospheric glow, matching the landing page's brand language */}
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{
+          background:
+            "radial-gradient(45% 35% at 12% 8%, rgba(78,187,255,0.28) 0%, transparent 70%)," +
+            "radial-gradient(40% 30% at 92% 100%, rgba(22,119,255,0.2) 0%, transparent 70%)",
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative min-h-screen w-full overflow-hidden bg-white shadow-[0_40px_100px_-30px_rgba(22,119,255,0.32)] ring-1 ring-[rgba(22,119,255,0.14)] sm:min-h-0 sm:max-w-5xl sm:rounded-[2rem] lg:max-w-6xl">
         <div className="grid md:grid-cols-2">
-          {/* Left: illustration panel — hidden on mobile so the page simplifies to just the form.
-              The blob shapes, dots, and speech bubbles are baked into skeleton-hero.png itself,
-              so the panel background just matches the PNG's own peach fill for a seamless edge. */}
-          <div className="relative hidden flex-col overflow-hidden bg-[#FFE6C9] p-8 md:flex lg:p-10">
-            <div className="relative z-10 flex w-full flex-1 items-center justify-center">
-              <motion.img
-                src="/skeleton-hero.png"
-                alt="Illustration of a skeleton working at a laptop"
-                className="w-full max-w-[440px] rounded-[1.75rem] object-contain shadow-[0_20px_50px_-20px_rgba(122,33,69,0.35)]"
-                animate={prefersReducedMotion ? undefined : { y: [0, -10, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              />
+          {/* Left: welcome message + illustration — stacked on mobile instead of
+              hidden, so the illustration is visible at every breakpoint. The
+              blob shapes, dots, and speech bubbles are baked into
+              skeleton-hero.png itself and are left completely untouched. */}
+          <div className="relative flex flex-col justify-center overflow-hidden p-8 lg:p-10" style={{ backgroundColor: HERO_BG }}>
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(55% 45% at 20% 15%, rgba(78,187,255,0.3) 0%, transparent 70%)," +
+                  "radial-gradient(45% 35% at 85% 90%, rgba(22,119,255,0.2) 0%, transparent 70%)",
+              }}
+              aria-hidden="true"
+            />
+
+            <div className="relative z-10 text-center">
+              <h2 className="font-serif text-2xl leading-tight lg:text-[28px]" style={{ color: NAVY }}>
+                Welcome to INVENTRA
+              </h2>
             </div>
 
-            <div className="relative z-10 mt-6">
-              <p className="text-2xl font-black leading-tight text-[#5B1730] lg:text-[28px]">
-                Every parcel, tracked.
-              </p>
-              <p className="mt-2 max-w-xs text-sm text-[#8A5A46]/90">
-                Manage inventory, stock, and shipments — all from one place.
+            <div className="relative z-10 mx-auto mt-6 w-full max-w-[360px]">
+              <GhostIllustration disableMotion={!!prefersReducedMotion} />
+            </div>
+
+            <div className="relative z-10 mt-6 text-center">
+              <p className="text-sm sm:text-base" style={{ color: MUTED }}>
+                Every parcel, tracked. Every stock, under control.
               </p>
             </div>
           </div>
@@ -244,10 +269,12 @@ export function LoginPage() {
             <div className="mx-auto w-full max-w-sm">
               <div className="mb-8 flex items-center gap-2.5">
                 <img src="/logo.png" alt="Inventra logo" className="h-9 w-9 rounded-lg object-contain" />
-                <span className="text-sm font-black tracking-[0.28em] text-[#5B1730]">INVENTRA</span>
+                <span className="text-sm font-black tracking-[0.28em]" style={{ color: NAVY }}>
+                  INVENTRA
+                </span>
               </div>
 
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-[26px]">
+              <h1 className="text-2xl font-black tracking-tight sm:text-[26px]" style={{ color: NAVY }}>
                 {mode === "login" ? "Login to your Account" : "Create your Account"}
               </h1>
               <p className="mt-1.5 text-sm text-slate-500">
@@ -267,7 +294,7 @@ export function LoginPage() {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={isGoogleLoading || !hasSupabaseConfig}
-                className="mt-6 flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A2145]/25 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-55"
+                className="mt-6 flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1677FF]/25 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-55"
               >
                 <GoogleIcon className="h-4 w-4" />
                 {isGoogleLoading ? "Redirecting…" : "Continue with Google"}
@@ -342,14 +369,14 @@ export function LoginPage() {
                         type="checkbox"
                         checked={rememberMe}
                         onChange={(event) => setRememberMe(event.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 accent-[#7A2145]"
+                        className="h-4 w-4 rounded border-slate-300 accent-[#1677FF]"
                       />
                       Remember Me
                     </label>
                     <button
                       type="button"
                       onClick={handleForgotPassword}
-                      className="font-semibold text-[#7A2145] transition hover:text-[#5B1730] hover:underline"
+                      className="font-semibold text-[#1677FF] transition hover:text-[#0F62E0] hover:underline"
                     >
                       Forgot Password?
                     </button>
@@ -499,14 +526,14 @@ export function LoginPage() {
                 {mode === "login" ? (
                   <>
                     Not Registered Yet?{" "}
-                    <button type="button" onClick={() => setMode("register")} className="font-semibold text-[#7A2145] hover:underline">
+                    <button type="button" onClick={() => setMode("register")} className="font-semibold text-[#1677FF] hover:underline">
                       Create an account
                     </button>
                   </>
                 ) : (
                   <>
                     Already have an account?{" "}
-                    <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#7A2145] hover:underline">
+                    <button type="button" onClick={() => setMode("login")} className="font-semibold text-[#1677FF] hover:underline">
                       Login
                     </button>
                   </>

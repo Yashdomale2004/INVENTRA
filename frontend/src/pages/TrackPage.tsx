@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, ExternalLink, Package, Plus, Search, Trash2, Truck, Upload } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, Package, Pencil, Plus, Search, Trash2, Truck, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,6 +13,7 @@ import { notifyOrderDelivered } from "../lib/notificationsStorage";
 import {
   fetchDispatchedEnquiries,
   findEnquiryByTrackingNumber,
+  updateEnquiry,
   updateEnquiryByTrackingNumber,
   type EnquiryRecord,
 } from "../services/enquiries";
@@ -67,6 +68,9 @@ export function TrackPage() {
     invoice_number: string;
   }>(null);
   const [matchedOrder, setMatchedOrder] = useState<EnquiryRecord | null>(null);
+  const [isEditingTracking, setIsEditingTracking] = useState(false);
+  const [trackingEditValue, setTrackingEditValue] = useState("");
+  const [isSavingTrackingEdit, setIsSavingTrackingEdit] = useState(false);
 
   const [dispatchedOrders, setDispatchedOrders] = useState<EnquiryRecord[]>([]);
   const [isDispatchedLoading, setIsDispatchedLoading] = useState(true);
@@ -233,6 +237,7 @@ export function TrackPage() {
   }, [trackingNumber]);
 
   const viewDispatchedOrder = (order: EnquiryRecord) => {
+    setIsEditingTracking(false);
     setTrackingNumber(order.trackingNumber);
     setMatchedOrder(order);
     setActiveResult({
@@ -259,8 +264,60 @@ export function TrackPage() {
     }
   };
 
+  const startEditTracking = () => {
+    if (!activeResult) return;
+    setTrackingEditValue(activeResult.trackingNumber);
+    setIsEditingTracking(true);
+  };
+
+  const cancelEditTracking = () => {
+    setIsEditingTracking(false);
+    setTrackingEditValue("");
+  };
+
+  const saveEditTracking = async () => {
+    if (!activeResult) return;
+    const nextTrackingNumber = trackingEditValue.trim();
+    if (!nextTrackingNumber) {
+      toast.error("Tracking number cannot be empty.");
+      return;
+    }
+
+    setIsSavingTrackingEdit(true);
+    try {
+      if (matchedOrder) {
+        const updatedOrder = await updateEnquiry(matchedOrder.id, {
+          customerName: matchedOrder.customerName,
+          customRequirement: matchedOrder.customRequirement,
+          combinations: matchedOrder.combinations,
+          trackingNumber: nextTrackingNumber,
+          orderStatus: matchedOrder.orderStatus,
+          statusHistory: matchedOrder.statusHistory,
+          deliveryDate: matchedOrder.deliveryDate,
+          notes: matchedOrder.notes,
+          extractedAddress: matchedOrder.extractedAddress,
+        });
+        setMatchedOrder(updatedOrder);
+        setActiveResult((prev) => (prev ? { ...prev, trackingNumber: updatedOrder.trackingNumber, invoice_number: updatedOrder.trackingNumber } : prev));
+        notifyInventorySync();
+      } else {
+        setActiveResult((prev) => (prev ? { ...prev, trackingNumber: nextTrackingNumber, invoice_number: nextTrackingNumber } : prev));
+      }
+      setTrackingNumber(nextTrackingNumber);
+      setSelectedTrackingNumber(nextTrackingNumber);
+      setIsEditingTracking(false);
+      toast.success("Tracking number updated.");
+    } catch (error) {
+      console.error("[TrackPage] saveEditTracking failed", error);
+      toast.error(getErrorMessage(error, "Failed to update tracking number."));
+    } finally {
+      setIsSavingTrackingEdit(false);
+    }
+  };
+
   const handleSearch = async () => {
     const tracking = trackingNumber.trim();
+    setIsEditingTracking(false);
     if (!tracking) {
       setActiveResult(null);
       setMatchedOrder(null);
@@ -409,18 +466,64 @@ export function TrackPage() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tracking Number</p>
-                <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{activeResult.trackingNumber}</p>
-                  <button
-                    type="button"
-                    onClick={() => copyTrackingNumber(activeResult.trackingNumber)}
-                    className="shrink-0 rounded-lg border border-slate-200 p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-800"
-                    aria-label="Copy tracking number"
-                    title="Copy tracking number"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
+                {isEditingTracking ? (
+                  <div className="mt-2 flex min-w-0 items-center gap-2">
+                    <Input
+                      className="h-9 flex-1 rounded-lg text-sm"
+                      value={trackingEditValue}
+                      onChange={(event) => setTrackingEditValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") saveEditTracking();
+                        if (event.key === "Escape") cancelEditTracking();
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={saveEditTracking}
+                      disabled={isSavingTrackingEdit}
+                      className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-blue-600 transition hover:bg-blue-100 disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"
+                      aria-label="Save tracking number"
+                      title="Save"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEditTracking}
+                      disabled={isSavingTrackingEdit}
+                      className="shrink-0 rounded-lg border border-slate-200 p-2.5 text-slate-500 transition hover:border-rose-300 hover:text-rose-600 disabled:opacity-60 dark:border-slate-700"
+                      aria-label="Cancel editing tracking number"
+                      title="Cancel"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{activeResult.trackingNumber}</p>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={startEditTracking}
+                        className="rounded-lg border border-slate-200 p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-800"
+                        aria-label="Edit tracking number"
+                        title="Edit tracking number"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyTrackingNumber(activeResult.trackingNumber)}
+                        className="rounded-lg border border-slate-200 p-3 text-slate-500 transition hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:hover:border-blue-800"
+                        aria-label="Copy tracking number"
+                        title="Copy tracking number"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="rounded-3xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Current Location</p>

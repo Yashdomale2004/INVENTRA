@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 
 import { ChunkErrorBoundary } from "./app/ChunkErrorBoundary";
 import { ProtectedRoute } from "./app/ProtectedRoute";
+import { ScrollToTop } from "./app/ScrollToTop";
 import { useTheme } from "./contexts/ThemeContext";
 import { AppLayout } from "./layouts/AppLayout";
 
@@ -46,6 +47,7 @@ function App() {
 
   return (
     <>
+      <ScrollToTop />
       <Toaster richColors theme={resolvedTheme} />
       <ChunkErrorBoundary>
         <Suspense fallback={<RouteFallback />}>

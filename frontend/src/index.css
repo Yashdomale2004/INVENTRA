@@ -26,6 +26,13 @@ body,
 html {
   overflow-x: hidden;
   overscroll-behavior-x: none;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {

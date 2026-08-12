@@ -10,6 +10,7 @@ import {
   Pencil,
   Printer,
   Search,
+  StickyNote,
   Trash2,
   Truck,
   X,
@@ -339,6 +340,8 @@ export function HomePage() {
   const { user } = useAuth();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState<{ orderId: string; value: string } | null>(null);
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const [history, setHistory] = useState<OrderHistoryEntry[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
@@ -747,6 +750,40 @@ export function HomePage() {
     }
   };
 
+  const openNoteEditor = (order: EnquiryRecord) => {
+    setNoteDraft({ orderId: order.id, value: order.notes });
+  };
+
+  const closeNoteEditor = () => {
+    setNoteDraft(null);
+  };
+
+  const saveOrderNote = async (order: EnquiryRecord) => {
+    if (!noteDraft || noteDraft.orderId !== order.id) return;
+
+    setIsSavingNote(true);
+    try {
+      await updateEnquiry(order.id, {
+        customerName: order.customerName,
+        customRequirement: order.customRequirement,
+        combinations: order.combinations,
+        trackingNumber: order.trackingNumber,
+        orderStatus: order.orderStatus,
+        statusHistory: order.statusHistory,
+        deliveryDate: order.deliveryDate,
+        notes: noteDraft.value.trim(),
+        extractedAddress: order.extractedAddress,
+      });
+      await refreshHistory();
+      toast.success("Note saved.");
+      setNoteDraft(null);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Failed to save note."));
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
   const closeDetailOrder = () => {
     setDetailOrder(null);
     setPreviewImage(null);
@@ -1001,6 +1038,55 @@ export function HomePage() {
                                 </div>
                               );
                             })}
+
+                            {/* Compact per-order note — persisted via EnquiryRecord.notes */}
+                            <div className="mt-1 border-t border-slate-100 pt-2 dark:border-slate-800">
+                              {noteDraft?.orderId === order.id ? (
+                                <div className="space-y-2">
+                                  <textarea
+                                    autoFocus
+                                    rows={2}
+                                    value={noteDraft.value}
+                                    onChange={(event) => setNoteDraft({ orderId: order.id, value: event.target.value })}
+                                    placeholder="Add a note for this order…"
+                                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                  />
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={closeNoteEditor}
+                                      className="rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isSavingNote}
+                                      onClick={() => saveOrderNote(order)}
+                                      className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                      {isSavingNote ? "Saving…" : "Save Note"}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openNoteEditor(order)}
+                                    className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                                  >
+                                    <StickyNote className="h-3.5 w-3.5" />
+                                    {order.notes.trim() ? "Edit Note" : "Add Note"}
+                                  </button>
+                                  {order.notes.trim() ? (
+                                    <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-xs italic text-slate-500 dark:text-slate-400">
+                                      "{order.notes.trim()}"
+                                    </p>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
                           </div>
                         ) : null}
                       </div>
@@ -1801,6 +1887,55 @@ export function HomePage() {
                                   </div>
                                 );
                               })}
+
+                              {/* Compact per-order note — persisted via EnquiryRecord.notes */}
+                              <div className="mt-1 border-t border-slate-200 pt-2 dark:border-white/10">
+                                {noteDraft?.orderId === order.id ? (
+                                  <div className="space-y-2">
+                                    <textarea
+                                      autoFocus
+                                      rows={2}
+                                      value={noteDraft.value}
+                                      onChange={(event) => setNoteDraft({ orderId: order.id, value: event.target.value })}
+                                      placeholder="Add a note for this order…"
+                                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-white/[0.03] dark:text-white"
+                                    />
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={closeNoteEditor}
+                                        className="rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:text-white/50 dark:hover:bg-white/5"
+                                      >
+                                        Cancel
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isSavingNote}
+                                        onClick={() => saveOrderNote(order)}
+                                        className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                      >
+                                        {isSavingNote ? "Saving…" : "Save Note"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openNoteEditor(order)}
+                                      className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                                    >
+                                      <StickyNote className="h-3.5 w-3.5" />
+                                      {order.notes.trim() ? "Edit Note" : "Add Note"}
+                                    </button>
+                                    {order.notes.trim() ? (
+                                      <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-xs italic text-slate-500 dark:text-white/40">
+                                        "{order.notes.trim()}"
+                                      </p>
+                                    ) : null}
+                                  </>
+                                )}
+                              </div>
                             </div>
                           ) : null}
                         </div>
