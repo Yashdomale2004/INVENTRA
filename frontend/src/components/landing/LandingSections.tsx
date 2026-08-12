@@ -1,10 +1,10 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Activity, BarChart3, Boxes, ClipboardList, ListChecks, Phone, PackagePlus, Truck } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Boxes, ClipboardList, ListChecks, Phone, PackagePlus, Truck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { BLUE, BORDER, CARD_BG, EASE_OUT, MUTED, NAVY, PAGE_BG } from "./theme";
+import { BLUE, BORDER, CARD_BG, CYAN, EASE_OUT, MUTED, NAVY, PAGE_BG } from "./theme";
 
 /** Fade-up-and-unblur entrance, triggered once when a section scrolls into
  * view. IntersectionObserver-backed (via whileInView), so it costs nothing
@@ -264,18 +264,88 @@ export function TermsSection() {
   );
 }
 
-const FOOTER_LINKS = [
-  { label: "Product", href: "#product" },
-  { label: "About", href: "#about" },
-  { label: "Support", href: "#support" },
-  { label: "Privacy Policy", href: "#privacy-policy" },
-  { label: "Terms of Service", href: "#terms" },
+export function FinalCtaSection() {
+  const reduced = useReducedMotion();
+
+  return (
+    <section className="px-5 py-20 sm:px-8 sm:py-28" style={{ backgroundColor: PAGE_BG }}>
+      <motion.div
+        {...reveal(reduced)}
+        className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] px-6 py-14 text-center shadow-[0_30px_70px_-30px_rgba(22,119,255,0.5)] sm:px-12 sm:py-20"
+        style={{ background: `linear-gradient(135deg, ${CYAN} 0%, ${BLUE} 55%, ${NAVY} 130%)` }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(50% 60% at 15% 10%, rgba(78,187,255,0.35) 0%, transparent 70%)," +
+              "radial-gradient(45% 55% at 90% 100%, rgba(78,187,255,0.25) 0%, transparent 70%)",
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="relative z-10">
+          <h2 className="mx-auto max-w-2xl font-serif text-[clamp(1.75rem,3.8vw,2.75rem)] leading-tight text-white">
+            Ready to Take Control of Your Inventory?
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm sm:text-base" style={{ color: "rgba(255,255,255,0.85)" }}>
+            Manage inventory, orders, shipments, and deliveries with INVENTRA — all in one place.
+          </p>
+
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              to="/login?mode=register"
+              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold shadow-[0_18px_36px_-12px_rgba(8,28,58,0.45)] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:w-auto"
+              style={{ color: BLUE }}
+            >
+              Get Started
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <Link
+              to="/login"
+              className="w-full rounded-xl border border-white/40 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 sm:w-auto"
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+    </section>
+  );
+}
+
+const FOOTER_COLUMNS: { title: string; links: { label: string; href: string; internal?: boolean }[] }[] = [
+  {
+    title: "Product",
+    links: [
+      { label: "Features", href: "#product" },
+      { label: "Inventory", href: "/inventory", internal: true },
+      { label: "Tracking", href: "/track", internal: true },
+      { label: "Dashboard", href: "/dashboard", internal: true },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "About", href: "#about" },
+      { label: "Contact", href: "#support" },
+      { label: "Support", href: "#support" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { label: "Documentation", href: "#support" },
+      { label: "Help Center", href: "#support" },
+      { label: "FAQ", href: "#support" },
+    ],
+  },
 ];
 
 export function SiteFooter() {
   return (
     <footer className="relative z-10 border-t px-5 py-12 sm:px-8" style={{ backgroundColor: PAGE_BG, borderColor: BORDER }}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 sm:flex-row sm:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-10 sm:flex-row sm:justify-between">
         <div className="max-w-xs">
           <Link to="/" className="flex items-center gap-2.5">
             <img src="/logo.png" alt="Inventra logo" className="h-7 w-7 object-contain" />
@@ -284,31 +354,33 @@ export function SiteFooter() {
             </span>
           </Link>
           <p className="mt-3 text-sm leading-relaxed" style={{ color: MUTED }}>
-            Inventory and parcel intelligence for T-shirt and apparel businesses.
+            Smart inventory and shipment management for modern businesses.
           </p>
+          <a href="tel:8483030945" className="mt-4 flex items-center gap-1.5 text-sm transition-colors hover:opacity-70" style={{ color: MUTED }}>
+            <Phone className="h-3.5 w-3.5" />
+            8483030945
+          </a>
         </div>
 
-        <div className="flex flex-wrap gap-x-10 gap-y-6 sm:justify-end">
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: NAVY }}>
-              Company
-            </p>
-            {FOOTER_LINKS.map((link) => (
-              <a key={link.label} href={link.href} className="text-sm transition-colors hover:opacity-70" style={{ color: MUTED }}>
-                {link.label}
-              </a>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: NAVY }}>
-              Support
-            </p>
-            <a href="tel:8483030945" className="flex items-center gap-1.5 text-sm transition-colors hover:opacity-70" style={{ color: MUTED }}>
-              <Phone className="h-3.5 w-3.5" />
-              8483030945
-            </a>
-          </div>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:flex sm:flex-wrap sm:justify-end sm:gap-x-12">
+          {FOOTER_COLUMNS.map((column) => (
+            <div key={column.title} className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: NAVY }}>
+                {column.title}
+              </p>
+              {column.links.map((link) =>
+                link.internal ? (
+                  <Link key={link.label} to={link.href} className="text-sm transition-colors hover:opacity-70" style={{ color: MUTED }}>
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a key={link.label} href={link.href} className="text-sm transition-colors hover:opacity-70" style={{ color: MUTED }}>
+                    {link.label}
+                  </a>
+                ),
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

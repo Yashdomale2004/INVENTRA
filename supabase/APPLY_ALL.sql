@@ -544,3 +544,48 @@ alter table public.enquiries
 alter table public.enquiries
   add column if not exists extracted_address text not null default '';
 
+-- ===== migrations/20260810_brand_logo.sql =====
+-- Optional brand logo, uploaded from the Management page.
+alter table public.brands
+  add column if not exists logo_url text;
+
+insert into storage.buckets (id, name, public)
+values ('brand-logos', 'brand-logos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "brand_logos_read" on storage.objects;
+drop policy if exists "brand_logos_write" on storage.objects;
+drop policy if exists "brand_logos_update" on storage.objects;
+drop policy if exists "brand_logos_delete" on storage.objects;
+
+create policy "brand_logos_read" on storage.objects
+for select
+using (bucket_id = 'brand-logos');
+
+create policy "brand_logos_write" on storage.objects
+for insert
+with check (bucket_id = 'brand-logos' and auth.uid() is not null);
+
+create policy "brand_logos_update" on storage.objects
+for update
+using (bucket_id = 'brand-logos' and auth.uid() is not null);
+
+create policy "brand_logos_delete" on storage.objects
+for delete
+using (bucket_id = 'brand-logos' and auth.uid() is not null);
+
+-- ===== migrations/20260811_backfill_product_sizes.sql =====
+-- Fix "Plain T-Shirts T-Shirt" naming, and backfill the full S/M/L/XL/XXL
+-- size range for the five core products (some were created before XXL/other
+-- sizes were required, so they're missing rows).
+update public.products
+set name = 'Plain T-Shirt', updated_at = now()
+where name = 'Plain T-Shirts T-Shirt';
+
+insert into public.product_sizes (product_id, size, created_by, updated_by)
+select p.id, s.size, p.created_by, p.created_by
+from public.products p
+cross join (values ('S'), ('M'), ('L'), ('XL'), ('XXL')) as s(size)
+where p.name in ('Ceramic Shield T-Shirt', 'Plain T-Shirt', 'Sunkool T-Shirt', 'Puma T-Shirt', 'RS T-Shirt')
+on conflict (product_id, size) do nothing;
+

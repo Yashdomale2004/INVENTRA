@@ -3,7 +3,15 @@ import { Navigate } from "react-router-dom";
 
 import { CinematicHero } from "../components/landing/CinematicHero";
 import { LandingNav } from "../components/landing/LandingNav";
-import { AboutSection, PrivacyPolicySection, ProductSection, SiteFooter, SupportSection, TermsSection } from "../components/landing/LandingSections";
+import {
+  AboutSection,
+  FinalCtaSection,
+  PrivacyPolicySection,
+  ProductSection,
+  SiteFooter,
+  SupportSection,
+  TermsSection,
+} from "../components/landing/LandingSections";
 import { PAGE_BG } from "../components/landing/theme";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -24,6 +32,7 @@ export function LandingPage() {
       <SupportSection />
       <PrivacyPolicySection />
       <TermsSection />
+      <FinalCtaSection />
       <SiteFooter />
     </div>
   );
